@@ -1,0 +1,10 @@
+# Ignore everything by default
+*
+
+# Only include what's needed for the Docker image
+!bin/plexishow
+!config.example.yaml
+
+# Allow Dockerfiles
+!Dockerfile
+!Dockerfile.gpu

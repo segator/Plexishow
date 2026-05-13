@@ -1,0 +1,14 @@
+FROM alpine:3.21
+RUN apk add --no-cache \
+    ffmpeg \
+    ca-certificates \
+    libva \
+    libva-intel-driver \
+    intel-media-driver \
+    mesa-va-gallium \
+    libdrm
+COPY bin/plexishow /usr/local/bin/plexishow
+COPY assets/ /assets/
+EXPOSE 8080
+ENTRYPOINT ["plexishow"]
+CMD ["-config", "/etc/plexishow/config.yaml"]
