@@ -221,6 +221,12 @@ Plexishow exposes Prometheus-compatible metrics at `/metrics`.
 # Run tests (inside Dagger)
 mage test
 
+# Run tests with coverage gate (inside Dagger)
+mage cover
+
+# Run linter (inside Dagger)
+mage lint
+
 # Build binary (inside Dagger)
 mage build
 

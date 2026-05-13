@@ -35,6 +35,18 @@ jobs:
       - name: Vet
         run: mage vet
 
+      - name: Lint (Dagger)
+        run: mage lint
+
+      - name: Coverage (Dagger)
+        run: mage cover
+
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
       - name: Tests (Dagger)
         run: mage test
 

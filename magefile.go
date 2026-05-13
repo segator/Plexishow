@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"dagger.io/dagger"
 	"github.com/magefile/mage/mg"
@@ -200,6 +201,83 @@ func VulnScan(ctx context.Context) error {
 		return err
 	}
 	fmt.Println(out)
+	return nil
+}
+
+// Cover runs tests with coverage report inside Dagger and enforces a minimum threshold
+func Cover(ctx context.Context) error {
+	fmt.Println("Running coverage in Dagger...")
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	src := client.Host().Directory(".")
+	golang := client.Container().
+		From("golang:1.22").
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithExec([]string{"go", "mod", "download"}).
+		WithExec([]string{"go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./..."}).
+		WithExec([]string{"go", "tool", "cover", "-func=/output/coverage.out", "-o", "/output/coverage.txt"})
+
+	// Export coverage report
+	_, err = golang.File("/output/coverage.out").Export(ctx, "coverage.out")
+	if err != nil {
+		return err
+	}
+
+	// Check threshold
+	threshold := 60.0 // minimum 60% coverage
+	coverageOutput, err := golang.File("/output/coverage.txt").Contents(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Parse total coverage from last line: "total: (statements) 67.3%"
+	lines := strings.Split(strings.TrimSpace(coverageOutput), "\n")
+	if len(lines) == 0 {
+		return fmt.Errorf("could not parse coverage output")
+	}
+	lastLine := lines[len(lines)-1]
+	var coverage float64
+	_, err = fmt.Sscanf(lastLine, "total: (statements) %f%%", &coverage)
+	if err != nil {
+		return fmt.Errorf("failed to parse coverage from line %q: %w", lastLine, err)
+	}
+
+	fmt.Printf("Coverage: %.1f%% (threshold: %.1f%%)\n", coverage, threshold)
+	if coverage < threshold {
+		return fmt.Errorf("coverage %.1f%% is below threshold %.1f%%", coverage, threshold)
+	}
+	fmt.Println("Coverage gate passed!")
+	return nil
+}
+
+// Lint runs golangci-lint inside a Dagger container
+func Lint(ctx context.Context) error {
+	fmt.Println("Running golangci-lint in Dagger...")
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	src := client.Host().Directory(".")
+	linter := client.Container().
+		From("golangci/golangci-lint:v1.59-alpine").
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithExec([]string{"golangci-lint", "run", "--timeout=5m", "./..."})
+
+	out, err := linter.Stdout(ctx)
+	if err != nil {
+		fmt.Println(out)
+		return err
+	}
+	fmt.Println(out)
+	fmt.Println("Lint passed!")
 	return nil
 }
 

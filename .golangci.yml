@@ -1,0 +1,41 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+
+output:
+  formats:
+    - format: colored-line-number
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - durationcheck
+    - exhaustive
+    - gosec
+    - misspell
+    - noctx
+    - prealloc
+    - predeclared
+    - reassign
+    - unconvert
+    - unparam
+    - whitespace
+
+linters-settings:
+  gosec:
+    severity: medium
+    confidence: medium
+  misspell:
+    locale: US
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
