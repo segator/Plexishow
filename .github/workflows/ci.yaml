@@ -5,33 +5,48 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+
+env:
+  # Dagger Cloud token for cache sharing (optional, free at dagger.io/cloud)
+  DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+
       - name: Install Mage
         run: go install github.com/magefile/mage@latest
+
       - name: Install Dagger CLI
         run: curl -L https://dl.dagger.io/dagger/install.sh | sh
+
       - name: Format Check
         run: |
           mage fmt
           git diff --exit-code || (echo "Code not formatted. Run 'mage fmt'" && exit 1)
+
       - name: Vet
         run: mage vet
-      - name: Run Dagger Test
+
+      - name: Tests (Dagger)
         run: mage test
-      - name: Run Dagger Build
+
+      - name: Build (Dagger)
         run: mage build
-      - name: Generate SBOM
+
+      - name: Generate SBOM (Dagger)
         run: mage sbom
-      - name: Vulnerability Scan
+
+      - name: Vulnerability Scan (Dagger)
         run: mage vulnscan
+
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
