@@ -1,0 +1,11 @@
+m3u_url: "https://example.com/playlist.m3u"
+# epg_url: "https://example.com/epg.xml"
+listen_addr: ":8080"
+max_streams: 4
+stream_timeout: "30s"
+refresh_interval: "1h"
+ffmpeg_path: "ffmpeg"
+default_headers:
+  token: "Bearer YOUR_TOKEN_HERE"
+  referer: "https://tv.example.com/"
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64)"

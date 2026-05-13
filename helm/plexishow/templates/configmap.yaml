@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "plexishow.fullname" . }}
+  labels:
+    {{- include "plexishow.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    m3u_url: {{ .Values.config.m3u_url | quote }}
+    epg_url: {{ .Values.config.epg_url | quote }}
+    listen_addr: {{ .Values.config.listen_addr | quote }}
+    max_streams: {{ .Values.config.max_streams }}
+    stream_timeout: {{ .Values.config.stream_timeout | quote }}
+    refresh_interval: {{ .Values.config.refresh_interval | quote }}
+    ffmpeg_path: {{ .Values.config.ffmpeg_path | quote }}
+    default_headers:
+      token: {{ .Values.config.default_headers.token | quote }}
+      referer: {{ .Values.config.default_headers.referer | quote }}
+      user_agent: {{ .Values.config.default_headers.user_agent | quote }}

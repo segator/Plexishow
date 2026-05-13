@@ -1,0 +1,10 @@
+/bin/
+/dist/
+*.test
+*.out
+.env
+.idea/
+.vscode/
+coverage.html
+test/fixtures/source.m3u
+sbom.json
