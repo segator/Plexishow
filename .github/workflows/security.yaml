@@ -16,8 +16,8 @@ jobs:
       - uses: jdx/mise-action@v2
       - run: go mod download
 
-      - name: Build
-        run: mage build
+      - name: Build binary
+        run: mage bin:build
 
       - name: SBOM
         run: mage sbom

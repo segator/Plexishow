@@ -75,10 +75,13 @@ func Test(ctx context.Context) error {
 	return nil
 }
 
-// Build compiles the binary
-func Build(ctx context.Context) error {
+// Bin groups binary-related targets.
+type Bin mg.Namespace
+
+// Build compiles the binary into bin/plexishow.
+func (Bin) Build(ctx context.Context) error {
 	mg.Deps(Vet)
-	fmt.Println("Building...")
+	fmt.Println("Building binary...")
 	if err := os.MkdirAll("bin", 0755); err != nil {
 		return err
 	}
@@ -86,27 +89,36 @@ func Build(ctx context.Context) error {
 	return sh.RunV("go", "build", ldflags, "-o", "bin/"+binaryName, "./cmd/plexishow")
 }
 
-// Docker builds and pushes the Docker image
-func Docker(ctx context.Context) error {
-	mg.Deps(Build)
+// Docker groups Docker image targets.
+type Docker mg.Namespace
+
+// Build builds the standard Docker image (depends on bin:build).
+func (Docker) Build(ctx context.Context) error {
+	mg.Deps(mg.F(Bin.Build, ctx))
 	fmt.Println("Building Docker image...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
-	if err := sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile", "."); err != nil {
-		return err
-	}
-	fmt.Println("Pushing:", tag)
+	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile", ".")
+}
+
+// Publish pushes the standard Docker image to the registry.
+func (Docker) Publish(ctx context.Context) error {
+	fmt.Println("Publishing Docker image...")
+	tag := fmt.Sprintf("%s:%s", imageName, version)
 	return sh.RunV("docker", "push", tag)
 }
 
-// DockerGPU builds and pushes the GPU Docker image
-func DockerGPU(ctx context.Context) error {
-	mg.Deps(Build)
+// BuildGPU builds the GPU Docker image (depends on bin:build).
+func (Docker) BuildGPU(ctx context.Context) error {
+	mg.Deps(mg.F(Bin.Build, ctx))
 	fmt.Println("Building GPU Docker image...")
 	tag := fmt.Sprintf("%s:%s-gpu", imageName, version)
-	if err := sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile.gpu", "."); err != nil {
-		return err
-	}
-	fmt.Println("Pushing:", tag)
+	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile.gpu", ".")
+}
+
+// PublishGPU pushes the GPU Docker image to the registry.
+func (Docker) PublishGPU(ctx context.Context) error {
+	fmt.Println("Publishing GPU Docker image...")
+	tag := fmt.Sprintf("%s:%s-gpu", imageName, version)
 	return sh.RunV("docker", "push", tag)
 }
 
@@ -123,9 +135,9 @@ func ReleaseSnapshot() error {
 	return sh.RunV("goreleaser", "release", "--snapshot", "--clean")
 }
 
-// Sbom generates SBOM using Syft
+// Sbom generates SBOM using Syft (depends on bin:build)
 func Sbom(ctx context.Context) error {
-	mg.Deps(Build)
+	mg.Deps(mg.F(Bin.Build, ctx))
 	fmt.Println("Generating SBOM...")
 	out, err := sh.Output("syft", "file:bin/"+binaryName, "-o", "spdx-json")
 	if err != nil {
@@ -168,9 +180,9 @@ func Clean() error {
 	return nil
 }
 
-// All runs fmt, vet, test, build
+// All runs fmt, vet, test, bin:build
 func All(ctx context.Context) {
 	mg.Deps(Fmt, Vet)
 	mg.Deps(Test)
-	mg.Deps(Build)
+	mg.Deps(mg.F(Bin.Build, ctx))
 }
