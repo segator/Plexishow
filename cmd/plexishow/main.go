@@ -86,6 +86,7 @@ func main() {
 
 	var epgSource *epg.Source
 	if cfg.EPGURL != "" {
+		fmt.Println("EPG URL:", cfg.EPGURL)
 		epgSource = epg.New(cfg.EPGURL, &http.Client{Timeout: 30 * time.Second})
 		if err := epgSource.Refresh(); err != nil {
 			fmt.Fprintf(os.Stderr, "initial epg fetch: %v\n", err)
@@ -97,6 +98,8 @@ func main() {
 				_ = epgSource.Refresh()
 			}
 		}()
+	} else {
+		fmt.Println("EPG: not configured (no url-tvg in M3U, no -epg-url flag, no PLEXISHOW_EPG_URL env)")
 	}
 
 	metricsReg := metrics.New()

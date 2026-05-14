@@ -16,17 +16,21 @@ var (
 	vlcoptRe   = regexp.MustCompile(`#EXTVLCOPT:(.+)`)
 )
 
-func Parse(data []byte) ([]Channel, error) {
+func Parse(data []byte) ([]Channel, string, error) {
 	if !bytes.HasPrefix(data, []byte("#EXTM3U")) {
-		return nil, fmt.Errorf("missing #EXTM3U header")
+		return nil, "", fmt.Errorf("missing #EXTM3U header")
 	}
 	var channels []Channel
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var current *Channel
+	var epgURL string
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#EXTM3U") {
+			if epgURL == "" && strings.HasPrefix(line, "#EXTM3U") {
+				epgURL = extractEPGURL(line)
+			}
 			continue
 		}
 
@@ -90,9 +94,19 @@ func Parse(data []byte) ([]Channel, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, epgURL, err
 	}
-	return channels, nil
+	return channels, epgURL, nil
+}
+
+// extractEPGURL parses the url-tvg attribute from the #EXTM3U line.
+func extractEPGURL(line string) string {
+	m := regexp.MustCompile(`url-tvg="([^"]+)"`).FindStringSubmatch(line)
+	if len(m) == 2 {
+		urls := strings.Split(m[1], ",")
+		return strings.TrimSpace(urls[0])
+	}
+	return ""
 }
 
 func parseVLCOpt(ch *Channel, opt string) {

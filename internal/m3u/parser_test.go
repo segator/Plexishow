@@ -10,7 +10,7 @@ func TestParseFixture(t *testing.T) {
 	if err != nil {
 		t.Skipf("fixture not available: %v", err)
 	}
-	chs, err := Parse(b)
+	chs, _, err := Parse(b)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestParseMinimal(t *testing.T) {
 #EXTVLCOPT:http-referrer=https://tv.movistar.com.pe/
 http://example.com/stream.mpd
 `
-	chs, err := Parse([]byte(data))
+	chs, _, err := Parse([]byte(data))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ http://example.com/stream.mpd
 }
 
 func TestParseNoHeader(t *testing.T) {
-	_, err := Parse([]byte("http://example.com\n"))
+	_, _, err := Parse([]byte("http://example.com\n"))
 	if err == nil {
 		t.Fatal("expected error for missing #EXTM3U")
 	}
@@ -67,7 +67,7 @@ func TestParseDuplicateChannels(t *testing.T) {
 	if err != nil {
 		t.Skipf("fixture not available: %v", err)
 	}
-	chs, _ := Parse(b)
+	chs, _, _ := Parse(b)
 	ids := make(map[string]int)
 	for _, c := range chs {
 		ids[c.ID]++

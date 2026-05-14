@@ -51,6 +51,8 @@ All settings are optional. The app starts with built-in defaults and layers conf
 
 The only **required** setting at runtime is a valid `m3u_url` (via flag, env, or config file).
 
+The **EPG URL** is optional. If not provided via CLI flag, env, or config file, the app tries to extract it from the `url-tvg` attribute in the `#EXTM3U` header of the playlist. If none is found, it logs a warning and the `/epg.xml` endpoint returns 404.
+
 ### YAML Config
 
 ```yaml

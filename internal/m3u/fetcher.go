@@ -57,9 +57,12 @@ func (f *Fetcher) Pull() error {
 	if err != nil {
 		return fmt.Errorf("read m3u: %w", err)
 	}
-	channels, err := Parse(data)
+	channels, epgURL, err := Parse(data)
 	if err != nil {
 		return fmt.Errorf("parse m3u: %w", err)
+	}
+	if f.cfg.EPGURL == "" && epgURL != "" {
+		f.cfg.EPGURL = epgURL
 	}
 
 	for i := range channels {
