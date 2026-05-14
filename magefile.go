@@ -183,6 +183,13 @@ func Clean() error {
 	return nil
 }
 
+// Run builds and runs the application locally.
+func Run(ctx context.Context) error {
+	mg.Deps(Bin.Build)
+	fmt.Println("Running plexishow...")
+	return sh.RunV("./bin/" + binaryName)
+}
+
 // All runs fmt, vet, test, bin:build
 func All(ctx context.Context) {
 	mg.Deps(Fmt, Vet)
