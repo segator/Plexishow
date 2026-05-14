@@ -42,12 +42,14 @@ Plexishow is an IPTV decryption proxy for Plex. It fetches encrypted M3U playlis
 
 ## Configuration
 
-Configuration is loaded with the following precedence (highest to lowest):
+All settings are optional. The app starts with built-in defaults and layers configuration from (highest to lowest precedence):
 
 1. **CLI flags**
 2. **Environment variables** (`PLEXISHOW_*`)
-3. **YAML config file**
+3. **YAML config file** (only if the file exists — no error if missing)
 4. **Built-in defaults**
+
+The only **required** setting at runtime is a valid `m3u_url` (via flag, env, or config file).
 
 ### YAML Config
 
@@ -130,16 +132,19 @@ Pre-built binaries for Linux, macOS, and Windows (amd64 / arm64) are available o
 ### Binary
 
 ```bash
-# With a config file
-./plexishow -config config.yaml
+# With CLI flags only (no config file needed)
+./plexishow -m3u-url "https://example.com/playlist.m3u" -epg-url "https://example.com/epg.xml"
 
 # With environment variables
 export PLEXISHOW_M3U_URL="https://example.com/playlist.m3u"
 export PLEXISHOW_EPG_URL="https://example.com/epg.xml"
 ./plexishow
 
-# With CLI flags only
-./plexishow -m3u-url "https://example.com/playlist.m3u" -epg-url "https://example.com/epg.xml"
+# With a config file
+./plexishow -config config.yaml
+
+# Or simply run via mage (no config file required)
+mage run
 ```
 
 ### Docker

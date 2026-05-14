@@ -52,6 +52,9 @@ func loadFromFile(path string, cfg *Config) error {
 	//#nosec G304 -- path comes from CLI flag, intentional
 	b, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("read config: %w", err)
 	}
 	return yaml.Unmarshal(b, cfg)
