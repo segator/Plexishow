@@ -252,27 +252,18 @@ mage sbom
 mage vulnscan
 ```
 
-### Dagger Cache
+### Dagger Build System
 
-Plexishow uses **Dagger** to run builds and tests in containers. By default, every run starts
-from scratch. To enable **cache sharing** between CI and local development:
+Builds and tests run inside **Dagger** containers for reproducibility.
+The magefile uses **cache volumes** for Go module and build caches:
 
-1. Sign up at [dagger.io/cloud](https://dagger.io/cloud) (free)
-2. Get your API token from the Dagger Cloud dashboard
-3. Copy `.env.example` to `.env` and add your token:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add: DAGGER_CLOUD_TOKEN=your_token_here
-   ```
+- `go-mod-cache` — Go module download cache
+- `go-build-cache` — Go build/compilation cache
 
-direnv automatically loads `.env` when you enter the project directory,
-so Dagger will use the shared cache. This makes repeated `mage test`
-and `mage build` runs significantly faster.
+Docker image builds push a **build cache** to `ghcr.io/segator/plexishow:buildcache`,
+which speeds up subsequent builds by reusing layers.
 
-**GitHub Actions:** The CI workflow reads `DAGGER_CLOUD_TOKEN` from
-the repository's `Actions secrets`. Add your Dagger Cloud token as
-a repository secret named `DAGGER_CLOUD_TOKEN` in:
-`Settings → Secrets and variables → Actions`.
+No external services required — everything runs locally or in CI.
 
 ---
 

@@ -32,6 +32,20 @@ func init() {
 	}
 }
 
+func goCacheVolumes(client *dagger.Client) (*dagger.CacheVolume, *dagger.CacheVolume) {
+	return client.CacheVolume("go-mod-cache"), client.CacheVolume("go-build-cache")
+}
+
+func goContainer(client *dagger.Client, src *dagger.Directory) *dagger.Container {
+	goCache, buildCache := goCacheVolumes(client)
+	return client.Container().
+		From("golang:1.22").
+		WithMountedDirectory("/src", src).
+		WithMountedCache("/go/pkg/mod", goCache).
+		WithMountedCache("/root/.cache/go-build", buildCache).
+		WithWorkdir("/src")
+}
+
 // Fmt runs go fmt (local, fast)
 func Fmt() error {
 	fmt.Println("Running fmt...")
@@ -55,10 +69,7 @@ func Test(ctx context.Context) error {
 	defer client.Close()
 
 	src := client.Host().Directory(".")
-	golang := client.Container().
-		From("golang:1.22").
-		WithMountedDirectory("/src", src).
-		WithWorkdir("/src").
+	golang := goContainer(client, src).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "test", "-v", "./..."})
 
@@ -79,10 +90,7 @@ func Build(ctx context.Context) error {
 	src := client.Host().Directory(".")
 	ldflags := fmt.Sprintf("-ldflags=-s -w -X main.version=%s", version)
 
-	golang := client.Container().
-		From("golang:1.22").
-		WithMountedDirectory("/src", src).
-		WithWorkdir("/src").
+	golang := goContainer(client, src).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "build", ldflags, "-o", "bin/plexishow", "./cmd/plexishow"})
 
@@ -101,6 +109,7 @@ func Docker(ctx context.Context) error {
 	defer client.Close()
 
 	src := client.Host().Directory(".")
+	cacheTag := "ghcr.io/segator/plexishow:buildcache"
 
 	image := src.DockerBuild(dagger.DirectoryDockerBuildOpts{
 		Dockerfile: "Dockerfile",
@@ -111,6 +120,11 @@ func Docker(ctx context.Context) error {
 		return err
 	}
 	fmt.Println("Published:", addr)
+
+	_, err = image.Publish(ctx, cacheTag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to push cache: %v\n", err)
+	}
 	return nil
 }
 
@@ -125,6 +139,7 @@ func DockerGPU(ctx context.Context) error {
 	defer client.Close()
 
 	src := client.Host().Directory(".")
+	cacheTag := "ghcr.io/segator/plexishow:buildcache-gpu"
 
 	image := src.DockerBuild(dagger.DirectoryDockerBuildOpts{
 		Dockerfile: "Dockerfile.gpu",
@@ -135,6 +150,11 @@ func DockerGPU(ctx context.Context) error {
 		return err
 	}
 	fmt.Println("Published:", addr)
+
+	_, err = image.Publish(ctx, cacheTag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to push cache: %v\n", err)
+	}
 	return nil
 }
 
@@ -214,28 +234,22 @@ func Cover(ctx context.Context) error {
 	defer client.Close()
 
 	src := client.Host().Directory(".")
-	golang := client.Container().
-		From("golang:1.22").
-		WithMountedDirectory("/src", src).
-		WithWorkdir("/src").
+	golang := goContainer(client, src).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./..."}).
 		WithExec([]string{"go", "tool", "cover", "-func=/output/coverage.out", "-o", "/output/coverage.txt"})
 
-	// Export coverage report
 	_, err = golang.File("/output/coverage.out").Export(ctx, "coverage.out")
 	if err != nil {
 		return err
 	}
 
-	// Check threshold
-	threshold := 60.0 // minimum 60% coverage
+	threshold := 60.0
 	coverageOutput, err := golang.File("/output/coverage.txt").Contents(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Parse total coverage from last line: "total: (statements) 67.3%"
 	lines := strings.Split(strings.TrimSpace(coverageOutput), "\n")
 	if len(lines) == 0 {
 		return fmt.Errorf("could not parse coverage output")

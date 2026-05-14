@@ -7,11 +7,6 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-env:
-  # Dagger Cloud token for cache sharing (free at dagger.io/cloud).
-  # Add your token as a GitHub secret named DAGGER_CLOUD_TOKEN.
-  DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
-
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
