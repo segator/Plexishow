@@ -287,21 +287,27 @@ mage release
 
 ## CI / CD
 
-The project uses a single GitHub Actions workflow (`.github/workflows/ci.yaml`) that runs on every PR and push to `main`.
+Two workflows run in parallel on every PR and push to `main`:
 
-### Pipeline Steps
+- **CI** (`.github/workflows/ci.yaml`) — Build, test, and publish pipeline.
+- **Security** (`.github/workflows/security.yaml`) — Vulnerability scanning and SARIF uploads.
+
+### CI Pipeline Steps
 
 1. **Format** — `mage fmt` + `git diff --exit-code`
 2. **Lint** — `mage lint` (golangci-lint)
 3. **Test + Coverage** — `mage test` (race detector + 40% threshold)
-4. **Security** — `mage security` (govulncheck + SBOM + Grype with SARIF reports)
-5. **Upload Reports** — SARIF reports uploaded to GitHub Security tab
-6. **Docker** — `mage docker:build` (standard + GPU images)
-7. **Publish** — `mage docker:publish` to GHCR (only on `main` pushes)
+4. **Docker** — `mage docker:build` (standard + GPU images)
+5. **Publish** — `mage docker:publish` to GHCR (only on `main` pushes)
 
-### Security Scan (Weekly)
+### Security Pipeline Steps
 
-A separate workflow (`.github/workflows/security.yaml`) runs every **Monday at 03:00 UTC** and on demand. It runs `mage security` and uploads SARIF reports to the GitHub Security tab.
+Runs `mage security` which executes in a single step:
+- **govulncheck** — Official Go vulnerability scanner (SARIF)
+- **SBOM** — Syft SPDX JSON generation
+- **Grype** — Container/dependency vulnerability scan (SARIF + table output, fails on critical)
+
+SARIF reports are uploaded to the GitHub Security tab automatically. The security workflow also runs weekly on Mondays at 03:00 UTC.
 
 ### Release
 

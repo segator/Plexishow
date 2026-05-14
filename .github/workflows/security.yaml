@@ -1,6 +1,11 @@
 name: Security Scan
 
 on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
   schedule:
     - cron: '0 3 * * 1' # Every Monday at 03:00 UTC
   workflow_dispatch:
@@ -14,7 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
-      - run: go mod download
 
       - name: Security Scan
         run: mage security
