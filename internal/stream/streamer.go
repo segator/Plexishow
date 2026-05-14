@@ -55,6 +55,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	args := buildArgs(ch)
+	//#nosec G204 -- ffmpeg path from config, intentional
 	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
 
 	stdout, err := cmd.StdoutPipe()
@@ -64,7 +65,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stderr, _ := cmd.StderrPipe()
-	defer stdout.Close()
+	defer func() { _ = stdout.Close() }()
 	if stderr != nil {
 		go func() { _, _ = io.Copy(io.Discard, stderr) }()
 	}

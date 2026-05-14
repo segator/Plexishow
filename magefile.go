@@ -45,18 +45,34 @@ func goSrc(client *dagger.Client) *dagger.Directory {
 			"cmd/**",
 			"internal/**",
 			"test/**",
+			".golangci.yml",
 		},
 	})
 }
 
-func goContainer(client *dagger.Client, src *dagger.Directory) *dagger.Container {
+// miseContainer returns a container with all tools from mise.toml installed.
+// This is the single source of truth for all tooling inside Dagger.
+func miseContainer(client *dagger.Client) *dagger.Container {
+	miseToml := client.Host().File("mise.toml")
+	miseCache := client.CacheVolume("mise-cache")
 	goCache, buildCache := goCacheVolumes(client)
+
 	return client.Container().
-		From("golang:1.25").
-		WithMountedDirectory("/src", src).
+		From("alpine:3.19").
+		WithExec([]string{"apk", "add", "--no-cache", "bash", "curl", "git"}).
+		WithExec([]string{"sh", "-c", "curl -sSfL https://mise.run | sh"}).
+		WithEnvVariable("PATH", "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin").
+		WithMountedFile("/mise.toml", miseToml).
+		WithMountedCache("/root/.local/share/mise", miseCache).
 		WithMountedCache("/go/pkg/mod", goCache).
 		WithMountedCache("/root/.cache/go-build", buildCache).
-		WithWorkdir("/src")
+		WithEnvVariable("MISE_TRUSTED_CONFIG_PATHS", "/mise.toml").
+		WithExec([]string{"mise", "install", "-y"})
+}
+
+// miseExec wraps a command with "mise exec --" so mise-managed tools are in PATH
+func miseExec(cmd ...string) []string {
+	return append([]string{"mise", "exec", "--"}, cmd...)
 }
 
 // Fmt runs go fmt (local, fast)
@@ -82,11 +98,12 @@ func Test(ctx context.Context) error {
 	defer client.Close()
 
 	src := goSrc(client)
-	golang := goContainer(client, src).
-		WithExec([]string{"go", "mod", "download"}).
-		WithExec([]string{"go", "test", "-v", "./..."})
-
-	_, err = golang.Stdout(ctx)
+	_, err = miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "test", "-v", "./...")).
+		Stdout(ctx)
 	return err
 }
 
@@ -103,10 +120,12 @@ func Build(ctx context.Context) error {
 	src := goSrc(client)
 	ldflags := fmt.Sprintf("-ldflags=-s -w -X main.version=%s", version)
 
-	golang := goContainer(client, src).
+	golang := miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "mod", "download"}).
-		WithExec([]string{"go", "build", ldflags, "-o", "bin/plexishow", "./cmd/plexishow"})
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "build", ldflags, "-o", "bin/plexishow", "./cmd/plexishow"))
 
 	_, err = golang.File("/src/bin/plexishow").Export(ctx, filepath.Join("bin", binaryName))
 	return err
@@ -185,7 +204,7 @@ func ReleaseSnapshot() error {
 	return sh.RunV("goreleaser", "release", "--snapshot", "--clean")
 }
 
-// Sbom generates SBOM using Syft inside Dagger
+// Sbom generates SBOM using Syft inside Dagger (via mise)
 func Sbom(ctx context.Context) error {
 	mg.Deps(Build)
 	fmt.Println("Generating SBOM in Dagger...")
@@ -197,23 +216,18 @@ func Sbom(ctx context.Context) error {
 
 	bin := client.Host().Directory("bin")
 
-	syft := client.Container().
-		From("golang:1.25").
-		WithExec([]string{"sh", "-c",
-			"curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"},
-		).
+	out, err := miseContainer(client).
 		WithMountedDirectory("/src", bin).
 		WithWorkdir("/src").
-		WithExec([]string{"syft", "file:plexishow", "-o", "spdx-json"})
-
-	out, err := syft.Stdout(ctx)
+		WithExec(miseExec("syft", "file:plexishow", "-o", "spdx-json")).
+		Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("syft: %w", err)
 	}
 	return os.WriteFile("sbom.json", []byte(out), 0644)
 }
 
-// VulnScan scans the SBOM for vulnerabilities using Grype inside Dagger
+// VulnScan scans the SBOM for vulnerabilities using Grype inside Dagger (via mise)
 func VulnScan(ctx context.Context) error {
 	mg.Deps(Sbom)
 	fmt.Println("Scanning for vulnerabilities in Dagger...")
@@ -223,18 +237,13 @@ func VulnScan(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	sbom := client.Host().File("sbom.json")
+	sbomFile := client.Host().File("sbom.json")
 
-	grype := client.Container().
-		From("golang:1.25").
-		WithExec([]string{"sh", "-c",
-			"curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin"},
-		).
-		WithMountedFile("/sbom.json", sbom).
+	out, err := miseContainer(client).
+		WithMountedFile("/sbom.json", sbomFile).
 		WithWorkdir("/").
-		WithExec([]string{"grype", "sbom:/sbom.json", "-o", "table", "--fail-on", "critical"})
-
-	out, err := grype.Stdout(ctx)
+		WithExec(miseExec("grype", "sbom:/sbom.json", "-o", "table", "--fail-on", "critical")).
+		Stdout(ctx)
 	if err != nil {
 		fmt.Println(out)
 		return err
@@ -253,11 +262,13 @@ func Cover(ctx context.Context) error {
 	defer client.Close()
 
 	src := goSrc(client)
-	golang := goContainer(client, src).
+	golang := miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
 		WithExec([]string{"mkdir", "-p", "/output"}).
-		WithExec([]string{"go", "mod", "download"}).
-		WithExec([]string{"go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./..."}).
-		WithExec([]string{"go", "tool", "cover", "-func=/output/coverage.out", "-o", "/output/coverage.txt"})
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./...")).
+		WithExec(miseExec("go", "tool", "cover", "-func=/output/coverage.out", "-o", "/output/coverage.txt"))
 
 	_, err = golang.File("/output/coverage.out").Export(ctx, "coverage.out")
 	if err != nil {
@@ -289,7 +300,8 @@ func Cover(ctx context.Context) error {
 	return nil
 }
 
-// Lint runs golangci-lint inside a Dagger container
+// Lint runs golangci-lint inside a Dagger container.
+// Uses go install (not mise binary) to ensure Go version compatibility.
 func Lint(ctx context.Context) error {
 	fmt.Println("Running golangci-lint in Dagger...")
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
@@ -299,12 +311,13 @@ func Lint(ctx context.Context) error {
 	defer client.Close()
 
 	src := goSrc(client)
-	linter := goContainer(client, src).
-		WithExec([]string{"go", "mod", "download"}).
-		WithExec([]string{"go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"}).
-		WithExec([]string{"golangci-lint", "run", "--timeout=5m", "./..."})
-
-	out, err := linter.Stdout(ctx)
+	out, err := miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest")).
+		WithExec(miseExec("golangci-lint", "run", "--timeout=5m", "./...")).
+		Stdout(ctx)
 	if err != nil {
 		fmt.Println(out)
 		return err

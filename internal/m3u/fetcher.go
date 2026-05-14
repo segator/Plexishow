@@ -48,7 +48,7 @@ func (f *Fetcher) Pull() error {
 	if err != nil {
 		return fmt.Errorf("fetch m3u: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("fetch m3u: status %d", resp.StatusCode)
 	}

@@ -1,6 +1,7 @@
 package epg
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +37,7 @@ func (s *Source) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Source) Refresh() error {
-	req, err := http.NewRequest("GET", s.url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", s.url, nil)
 	if err != nil {
 		return err
 	}
@@ -44,7 +45,7 @@ func (s *Source) Refresh() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("epg fetch status %d", resp.StatusCode)
 	}
