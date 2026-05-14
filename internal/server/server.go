@@ -58,9 +58,9 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 		Handler:           s.Router(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	//nolint:gosec // shutdown context is independent of any request scope
 	go func() {
 		<-ctx.Done()
-		//nolint:gosec // shutdown context is independent of any request scope
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
