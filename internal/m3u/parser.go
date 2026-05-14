@@ -144,7 +144,11 @@ func parseStreamHeaders(ch *Channel, line string) {
 		}
 		parts := strings.SplitN(h, "=", 2)
 		if len(parts) == 2 {
-			ch.Headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			key := strings.TrimSpace(parts[0])
+			if strings.EqualFold(key, "x-tcdn-token") {
+				key = "X-TCDN-token"
+			}
+			ch.Headers[key] = strings.TrimSpace(parts[1])
 		}
 	}
 }

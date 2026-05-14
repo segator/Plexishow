@@ -38,7 +38,7 @@ const ansiReset = "\033[0m"
 func channelColor(name string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(name))
-	return ansiColors[h.Sum32()%uint32(len(ansiColors))]
+	return ansiColors[int(h.Sum32())%len(ansiColors)]
 }
 
 type Manager struct {
