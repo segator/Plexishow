@@ -20,7 +20,7 @@ jobs:
           # with repo scope, add it to repo secrets as GH_PAT, and use it below.
           #
           # token: ${{ secrets.GH_PAT }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           release-type: go
           package-name: plexishow
           target-branch: main
