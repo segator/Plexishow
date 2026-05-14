@@ -145,6 +145,10 @@ export PLEXISHOW_EPG_URL="https://example.com/epg.xml"
 
 # Or simply run via mage (no config file required)
 mage run
+
+# Pass flags to the binary via mage (use --)
+mage run -- -help
+mage run -- -m3u-url "https://example.com/playlist.m3u"
 ```
 
 ### Docker
@@ -234,6 +238,7 @@ mage bin:build
 
 # Run binary locally
 mage run
+mage run -- -help
 
 # Build Docker images (standard + GPU)
 mage docker:build

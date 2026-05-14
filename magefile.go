@@ -13,6 +13,20 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+// targetArgs returns any arguments passed after the target name in os.Args.
+// Mage receives: mage [flags] <target> [args...]
+func targetArgs() []string {
+	for i, a := range os.Args {
+		if strings.EqualFold(a, "run") {
+			if i+1 < len(os.Args) {
+				return os.Args[i+1:]
+			}
+			break
+		}
+	}
+	return nil
+}
+
 var (
 	binaryName = "plexishow"
 	imageName  = "ghcr.io/segator/plexishow"
@@ -198,11 +212,21 @@ func Clean() error {
 	return nil
 }
 
-// Run builds and runs the application locally.
+// Run builds and runs the application locally, forwarding any extra arguments.
+// Use `--` to pass flags to the binary:
+//
+//	mage run
+//	mage run -- -help
+//	mage run -- -m3u-url https://example.com/playlist.m3u
 func Run(ctx context.Context) error {
 	mg.Deps(Bin.Build)
+	bin := "./bin/" + binaryName
+	extra := targetArgs()
 	fmt.Println("Running plexishow...")
-	return sh.RunV("./bin/" + binaryName)
+	if len(extra) == 0 {
+		return sh.RunV(bin)
+	}
+	return sh.RunV(bin, extra...)
 }
 
 // All runs fmt, vet, test, bin:build
