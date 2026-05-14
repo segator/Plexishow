@@ -132,29 +132,26 @@ func (m *Manager) Shutdown() {
 }
 
 func buildArgs(ch m3u.Channel) []string {
-	args := []string{
-		"-fflags", "+discardcorrupt",
-		"-headers", buildHeaders(ch.Headers),
-		"-i", ch.URL,
-		"-c:v", "copy",
-		"-c:a", "aac",
-		"-f", "mpegts",
-		"-",
-	}
-	if ch.KeyID != "" && ch.Key != "" {
-		newArgs := make([]string, 0, len(args)+4)
-		newArgs = append(newArgs, args[0:2]...)
-		newArgs = append(newArgs, "-cenc_decryption_key", fmt.Sprintf("%s:%s", ch.KeyID, ch.Key))
-		newArgs = append(newArgs, args[2:]...)
-		args = newArgs
-	}
-	return args
-}
+	var args []string
 
-func buildHeaders(h map[string]string) string {
-	var b strings.Builder
-	for k, v := range h {
-		fmt.Fprintf(&b, "%s: %s\r\n", k, v)
+	args = append(args, "-y")
+
+	if ch.KeyID != "" && ch.Key != "" {
+		args = append(args, "-cenc_decryption_key", fmt.Sprintf("%s:%s", ch.KeyID, ch.Key))
 	}
-	return b.String()
+
+	// ffmpeg has a dedicated -user_agent flag; everything else goes via -headers
+	if ua, ok := ch.Headers["User-Agent"]; ok {
+		args = append(args, "-user_agent", ua)
+	}
+	for k, v := range ch.Headers {
+		if k == "User-Agent" {
+			continue
+		}
+		args = append(args, "-headers", fmt.Sprintf("%s: %s", k, v))
+	}
+
+	args = append(args, "-re", "-i", ch.URL)
+	args = append(args, "-c:v", "copy", "-c:a", "aac", "-f", "mpegts", "-")
+	return args
 }

@@ -3,7 +3,6 @@ package stream
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -61,9 +60,8 @@ func TestBuildArgsNoKey(t *testing.T) {
 	ch := m3u.Channel{URL: "http://example.com/stream.mpd"}
 	args := buildArgs(ch)
 	want := []string{
-		"-fflags", "+discardcorrupt",
-		"-headers", "",
-		"-i", "http://example.com/stream.mpd",
+		"-y",
+		"-re", "-i", "http://example.com/stream.mpd",
 		"-c:v", "copy",
 		"-c:a", "aac",
 		"-f", "mpegts",
@@ -82,10 +80,6 @@ func TestBuildArgsNoKey(t *testing.T) {
 func TestBuildArgsWithKey(t *testing.T) {
 	ch := m3u.Channel{URL: "http://example.com/stream.mpd", KeyID: "kid1", Key: "key1"}
 	args := buildArgs(ch)
-	// -cenc_decryption_key should be inserted after -fflags +discardcorrupt and before -headers
-	if len(args) == 0 {
-		t.Fatal("no args")
-	}
 	found := false
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-cenc_decryption_key" && args[i+1] == "kid1:key1" {
@@ -98,23 +92,42 @@ func TestBuildArgsWithKey(t *testing.T) {
 	}
 }
 
-func TestBuildHeaders(t *testing.T) {
-	h := map[string]string{
-		"Referer":    "https://tv.example.com/",
-		"User-Agent": "TestAgent",
+func TestBuildArgsWithHeaders(t *testing.T) {
+	ch := m3u.Channel{
+		URL:     "http://example.com/stream.mpd",
+		Headers: map[string]string{"User-Agent": "TestAgent", "Referer": "https://tv.example.com/", "X-TCDN-token": "tok123"},
 	}
-	got := buildHeaders(h)
-	if !strings.Contains(got, "Referer: https://tv.example.com/") {
-		t.Errorf("missing Referer in %q", got)
-	}
-	if !strings.Contains(got, "User-Agent: TestAgent") {
-		t.Errorf("missing User-Agent in %q", got)
-	}
-}
+	args := buildArgs(ch)
 
-func TestBuildHeadersEmpty(t *testing.T) {
-	got := buildHeaders(map[string]string{})
-	if got != "" {
-		t.Errorf("expected empty, got %q", got)
+	// User-Agent should become -user_agent
+	foundUA := false
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "-user_agent" && args[i+1] == "TestAgent" {
+			foundUA = true
+			break
+		}
+	}
+	if !foundUA {
+		t.Errorf("missing -user_agent in args: %v", args)
+	}
+
+	// Referer and X-TCDN-token should become individual -headers
+	foundReferer := false
+	foundToken := false
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "-headers" {
+			if args[i+1] == "Referer: https://tv.example.com/" {
+				foundReferer = true
+			}
+			if args[i+1] == "X-TCDN-token: tok123" {
+				foundToken = true
+			}
+		}
+	}
+	if !foundReferer {
+		t.Errorf("missing Referer header in args: %v", args)
+	}
+	if !foundToken {
+		t.Errorf("missing X-TCDN-token header in args: %v", args)
 	}
 }

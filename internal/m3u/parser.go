@@ -65,6 +65,10 @@ func Parse(data []byte) ([]Channel, string, error) {
 				current.KeyID = strings.ToLower(m[1])
 				current.Key = strings.ToLower(m[2])
 			}
+			// Parse stream_headers (e.g. X-TCDN-token)
+			if strings.Contains(line, "stream_headers=") && current != nil {
+				parseStreamHeaders(current, line)
+			}
 			continue
 		}
 
@@ -117,6 +121,28 @@ func parseVLCOpt(ch *Channel, opt string) {
 	} else if strings.HasPrefix(opt, "http-header=") {
 		rest := strings.TrimPrefix(opt, "http-header=")
 		parts := strings.SplitN(rest, ":", 2)
+		if len(parts) == 2 {
+			ch.Headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+}
+
+// parseStreamHeaders extracts key=value pairs from
+// #KODIPROP:inputstream.adaptive.stream_headers=Key=Value
+func parseStreamHeaders(ch *Channel, line string) {
+	prefix := "#KODIPROP:inputstream.adaptive.stream_headers="
+	idx := strings.Index(line, prefix)
+	if idx == -1 {
+		return
+	}
+	rest := line[idx+len(prefix):]
+	// Some playlists put multiple headers separated by \r\n
+	for _, h := range strings.Split(rest, "\r\n") {
+		h = strings.TrimSpace(h)
+		if h == "" {
+			continue
+		}
+		parts := strings.SplitN(h, "=", 2)
 		if len(parts) == 2 {
 			ch.Headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 		}

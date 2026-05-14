@@ -90,6 +90,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initial m3u fetch: %v\n", err)
 		os.Exit(1)
 	}
+	chs := st.All()
+	fmt.Printf("Loaded %d channels\n", len(chs))
+	for _, c := range chs {
+		fmt.Printf("  - %s (%s)\n", c.Name, c.Group)
+	}
 	fetcher.Start()
 
 	var epgSource *epg.Source
