@@ -1,6 +1,7 @@
 package m3u
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,7 +30,7 @@ func NewFetcher(cfg config.Config, s ChannelStore) *Fetcher {
 }
 
 func (f *Fetcher) Pull() error {
-	req, err := http.NewRequest("GET", f.cfg.M3UURL, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", f.cfg.M3UURL, nil)
 	if err != nil {
 		return err
 	}
@@ -84,13 +85,9 @@ func (f *Fetcher) Start() {
 	go func() {
 		ticker := time.NewTicker(f.cfg.RefreshInterval)
 		defer ticker.Stop()
-		if err := f.Pull(); err != nil {
-			// TODO: logging
-		}
+		_ = f.Pull()
 		for range ticker.C {
-			if err := f.Pull(); err != nil {
-				// TODO: logging
-			}
+			_ = f.Pull()
 		}
 	}()
 }

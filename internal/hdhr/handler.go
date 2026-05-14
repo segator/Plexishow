@@ -31,7 +31,7 @@ func (h *Handler) DeviceXML(w http.ResponseWriter, r *http.Request) {
 		SerialNumber: "12345678",
 	}
 	w.Header().Set("Content-Type", "application/xml")
-	w.Write([]byte(xml.Header))
+	_, _ = w.Write([]byte(xml.Header))
 	enc := xml.NewEncoder(w)
 	enc.Indent("", "  ")
 	_ = enc.Encode(d)
@@ -84,5 +84,5 @@ func (h *Handler) Lineup(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	b, _ := json.MarshalIndent(v, "", "  ")
-	w.Write(b)
+	_, _ = w.Write(b)
 }

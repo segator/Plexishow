@@ -36,10 +36,23 @@ func goCacheVolumes(client *dagger.Client) (*dagger.CacheVolume, *dagger.CacheVo
 	return client.CacheVolume("go-mod-cache"), client.CacheVolume("go-build-cache")
 }
 
+// goSrc returns only Go-relevant files (excludes README, helm, etc.)
+func goSrc(client *dagger.Client) *dagger.Directory {
+	return client.Host().Directory(".", dagger.HostDirectoryOpts{
+		Include: []string{
+			"go.mod",
+			"go.sum",
+			"cmd/**",
+			"internal/**",
+			"test/**",
+		},
+	})
+}
+
 func goContainer(client *dagger.Client, src *dagger.Directory) *dagger.Container {
 	goCache, buildCache := goCacheVolumes(client)
 	return client.Container().
-		From("golang:1.22").
+		From("golang:1.25").
 		WithMountedDirectory("/src", src).
 		WithMountedCache("/go/pkg/mod", goCache).
 		WithMountedCache("/root/.cache/go-build", buildCache).
@@ -68,7 +81,7 @@ func Test(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".")
+	src := goSrc(client)
 	golang := goContainer(client, src).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "test", "-v", "./..."})
@@ -87,7 +100,7 @@ func Build(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".")
+	src := goSrc(client)
 	ldflags := fmt.Sprintf("-ldflags=-s -w -X main.version=%s", version)
 
 	golang := goContainer(client, src).
@@ -181,13 +194,13 @@ func Sbom(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".")
+	src := client.Host().Directory("bin")
 
 	syft := client.Container().
-		From("anchore/syft:latest").
+		From("ghcr.io/anchore/syft:latest").
 		WithMountedDirectory("/src", src).
 		WithWorkdir("/src").
-		WithExec([]string{"syft", "bin/plexishow", "-o", "spdx-json", "--file", "/output/sbom.json"})
+		WithExec([]string{"syft", "plexishow", "-o", "spdx-json", "--file", "/output/sbom.json"})
 
 	_, err = syft.File("/output/sbom.json").Export(ctx, "sbom.json")
 	if err != nil {
@@ -207,10 +220,12 @@ func VulnScan(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".")
+	src := client.Host().Directory(".", dagger.HostDirectoryOpts{
+		Include: []string{"sbom.json"},
+	})
 
 	grype := client.Container().
-		From("anchore/grype:latest").
+		From("ghcr.io/anchore/grype:latest").
 		WithMountedDirectory("/src", src).
 		WithWorkdir("/src").
 		WithExec([]string{"grype", "sbom:sbom.json", "-o", "table", "--fail-on", "critical"})
@@ -233,7 +248,7 @@ func Cover(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".")
+	src := goSrc(client)
 	golang := goContainer(client, src).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./..."}).
@@ -278,11 +293,10 @@ func Lint(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".")
-	linter := client.Container().
-		From("golangci/golangci-lint:v1.59-alpine").
-		WithMountedDirectory("/src", src).
-		WithWorkdir("/src").
+	src := goSrc(client)
+	linter := goContainer(client, src).
+		WithExec([]string{"go", "mod", "download"}).
+		WithExec([]string{"go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"}).
 		WithExec([]string{"golangci-lint", "run", "--timeout=5m", "./..."})
 
 	out, err := linter.Stdout(ctx)

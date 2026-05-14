@@ -11,7 +11,7 @@ import (
 func TestFetchAndServe(t *testing.T) {
 	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
-		w.Write([]byte(`<?xml version="1.0"?><tv><channel id="foo"></channel></tv>`))
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><tv><channel id="foo"></channel></tv>`))
 	}))
 	defer src.Close()
 

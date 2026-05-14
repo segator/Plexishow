@@ -54,7 +54,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	args := buildArgs(m.cfg, ch)
+	args := buildArgs(ch)
 	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
 
 	stdout, err := cmd.StdoutPipe()
@@ -66,7 +66,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stderr, _ := cmd.StderrPipe()
 	defer stdout.Close()
 	if stderr != nil {
-		go io.Copy(io.Discard, stderr)
+		go func() { _, _ = io.Copy(io.Discard, stderr) }()
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -129,7 +129,7 @@ func (m *Manager) Shutdown() {
 	}
 }
 
-func buildArgs(cfg config.Config, ch m3u.Channel) []string {
+func buildArgs(ch m3u.Channel) []string {
 	args := []string{
 		"-fflags", "+discardcorrupt",
 		"-headers", buildHeaders(ch.Headers),

@@ -55,7 +55,7 @@ func TestLoadFromEnvOverridesFile(t *testing.T) {
 	data := []byte(`m3u_url: "https://file.com/playlist.m3u"
 max_streams: 2
 `)
-	os.WriteFile(p, data, 0644)
+	_ = os.WriteFile(p, data, 0644)
 
 	cfg, err := Load(p, nil)
 	if err != nil {

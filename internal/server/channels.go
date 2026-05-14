@@ -15,5 +15,5 @@ func (s *Server) ServeM3U(w http.ResponseWriter, r *http.Request) {
 			ch.TVGID, ch.TVGLogo, ch.Group, ch.Name)
 		fmt.Fprintf(&b, "%s/stream/%s\n", s.baseURL, ch.ID)
 	}
-	w.Write([]byte(b.String()))
+	_, _ = w.Write([]byte(b.String()))
 }

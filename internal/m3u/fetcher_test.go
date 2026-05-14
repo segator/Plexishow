@@ -29,7 +29,7 @@ func TestFetcherPull(t *testing.T) {
 		if r.Header.Get("X-TCDN-token") != "abc" {
 			t.Errorf("missing token header")
 		}
-		w.Write([]byte(`#EXTM3U
+		_, _ = w.Write([]byte(`#EXTM3U
 #EXTINF:-1 tvg-id="x",Test
 #KODIPROP:inputstream.adaptive.license_key=a:b
 http://s/stream.mpd

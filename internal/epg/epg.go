@@ -32,7 +32,7 @@ func (s *Source) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/xml")
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func (s *Source) Refresh() error {

@@ -20,7 +20,8 @@ import (
 	"github.com/aymerici/plexishow/internal/stream"
 )
 
-var version = "dev"
+// version is set at build time via -ldflags "-X main.version=$(VERSION)"
+var version = "dev" //nolint:unused
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to config file")

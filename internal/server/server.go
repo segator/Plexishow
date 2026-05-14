@@ -47,7 +47,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("/metrics", s.metrics.Handler())
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 	return mux
 }
