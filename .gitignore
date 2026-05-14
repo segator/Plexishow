@@ -14,3 +14,4 @@ sbom.json
 # mise
 /.mise/
 /plexishow
+*.sarif
