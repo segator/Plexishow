@@ -93,7 +93,7 @@ func main() {
 	chs := st.All()
 	fmt.Printf("Loaded %d channels\n", len(chs))
 	for _, c := range chs {
-		fmt.Printf("  - %s (%s)\n", c.Name, c.Group)
+		fmt.Printf("  - %s (%s) -> %s\n", c.Name, c.Group, c.URL)
 	}
 	fetcher.Start()
 

@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -68,7 +69,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stderr, _ := cmd.StderrPipe()
 	defer func() { _ = stdout.Close() }()
 	if stderr != nil {
-		go func() { _, _ = io.Copy(io.Discard, stderr) }()
+		go func() {
+			scanner := bufio.NewScanner(stderr)
+			for scanner.Scan() {
+				fmt.Printf("[%s] %s\n", ch.Name, scanner.Text())
+			}
+		}()
 	}
 
 	if err := cmd.Start(); err != nil {
