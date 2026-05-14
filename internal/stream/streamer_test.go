@@ -3,6 +3,7 @@ package stream
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,23 +112,23 @@ func TestBuildArgsWithHeaders(t *testing.T) {
 		t.Errorf("missing -user_agent in args: %v", args)
 	}
 
-	// Referer and X-TCDN-token should become individual -headers
-	foundReferer := false
-	foundToken := false
+	// Referer and X-TCDN-token should be inside the single -headers string
+	foundHdr := false
+	var hdrValue string
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-headers" {
-			if args[i+1] == "Referer: https://tv.example.com/" {
-				foundReferer = true
-			}
-			if args[i+1] == "X-TCDN-token: tok123" {
-				foundToken = true
-			}
+			hdrValue = args[i+1]
+			foundHdr = true
+			break
 		}
 	}
-	if !foundReferer {
-		t.Errorf("missing Referer header in args: %v", args)
+	if !foundHdr {
+		t.Fatalf("missing -headers in args: %v", args)
 	}
-	if !foundToken {
-		t.Errorf("missing X-TCDN-token header in args: %v", args)
+	if !strings.Contains(hdrValue, "Referer: https://tv.example.com/") {
+		t.Errorf("missing Referer in headers: %q", hdrValue)
+	}
+	if !strings.Contains(hdrValue, "X-TCDN-token: tok123") {
+		t.Errorf("missing X-TCDN-token in headers: %q", hdrValue)
 	}
 }

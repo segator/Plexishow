@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net/http"
 	"os/exec"
@@ -16,6 +17,29 @@ import (
 	"github.com/aymerici/plexishow/internal/metrics"
 	"github.com/aymerici/plexishow/internal/store"
 )
+
+var ansiColors = []string{
+	"\033[31m", // red
+	"\033[32m", // green
+	"\033[33m", // yellow
+	"\033[34m", // blue
+	"\033[35m", // magenta
+	"\033[36m", // cyan
+	"\033[91m", // bright red
+	"\033[92m", // bright green
+	"\033[93m", // bright yellow
+	"\033[94m", // bright blue
+	"\033[95m", // bright magenta
+	"\033[96m", // bright cyan
+}
+
+const ansiReset = "\033[0m"
+
+func channelColor(name string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	return ansiColors[h.Sum32()%uint32(len(ansiColors))]
+}
 
 type Manager struct {
 	cfg     config.Config
@@ -70,9 +94,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = stdout.Close() }()
 	if stderr != nil {
 		go func() {
+			color := channelColor(ch.Name)
 			scanner := bufio.NewScanner(stderr)
 			for scanner.Scan() {
-				fmt.Printf("[%s] %s\n", ch.Name, scanner.Text())
+				fmt.Printf("%s[%s]%s %s\n", color, ch.Name, ansiReset, scanner.Text())
 			}
 		}()
 	}
@@ -150,11 +175,17 @@ func buildArgs(ch m3u.Channel) []string {
 	if ua, ok := ch.Headers["User-Agent"]; ok {
 		args = append(args, "-user_agent", ua)
 	}
+
+	// Build a single -headers string with all headers separated by \r\n
+	var hdr strings.Builder
 	for k, v := range ch.Headers {
 		if k == "User-Agent" {
 			continue
 		}
-		args = append(args, "-headers", fmt.Sprintf("%s: %s", k, v))
+		fmt.Fprintf(&hdr, "%s: %s\r\n", k, v)
+	}
+	if hdr.Len() > 0 {
+		args = append(args, "-headers", hdr.String())
 	}
 
 	args = append(args, "-re", "-i", ch.URL)
