@@ -3,9 +3,14 @@ name: CI
 on:
   push:
     branches: [main, master]
+    tags: ["v*"]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
 
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_GW_ENDPOINT }}
@@ -16,6 +21,7 @@ env:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
@@ -74,3 +80,19 @@ jobs:
         run: mage docker
         env:
           VERSION: dev
+
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v2
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
