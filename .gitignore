@@ -8,3 +8,9 @@
 coverage.html
 test/fixtures/source.m3u
 sbom.json
+
+# direnv
+/.direnv/
+
+# mise
+/.mise/
