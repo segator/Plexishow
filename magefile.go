@@ -104,6 +104,7 @@ func Build(ctx context.Context) error {
 	ldflags := fmt.Sprintf("-ldflags=-s -w -X main.version=%s", version)
 
 	golang := goContainer(client, src).
+		WithEnvVariable("CGO_ENABLED", "0").
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "build", ldflags, "-o", "bin/plexishow", "./cmd/plexishow"})
 
@@ -194,20 +195,22 @@ func Sbom(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory("bin")
+	bin := client.Host().Directory("bin")
 
 	syft := client.Container().
-		From("ghcr.io/anchore/syft:latest").
-		WithMountedDirectory("/src", src).
+		From("golang:1.25").
+		WithExec([]string{"sh", "-c",
+			"curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"},
+		).
+		WithMountedDirectory("/src", bin).
 		WithWorkdir("/src").
-		WithExec([]string{"syft", "plexishow", "-o", "spdx-json", "--file", "/output/sbom.json"})
+		WithExec([]string{"syft", "file:plexishow", "-o", "spdx-json"})
 
-	_, err = syft.File("/output/sbom.json").Export(ctx, "sbom.json")
+	out, err := syft.Stdout(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("syft: %w", err)
 	}
-	fmt.Println("SBOM saved to sbom.json")
-	return nil
+	return os.WriteFile("sbom.json", []byte(out), 0644)
 }
 
 // VulnScan scans the SBOM for vulnerabilities using Grype inside Dagger
@@ -220,15 +223,16 @@ func VulnScan(ctx context.Context) error {
 	}
 	defer client.Close()
 
-	src := client.Host().Directory(".", dagger.HostDirectoryOpts{
-		Include: []string{"sbom.json"},
-	})
+	sbom := client.Host().File("sbom.json")
 
 	grype := client.Container().
-		From("ghcr.io/anchore/grype:latest").
-		WithMountedDirectory("/src", src).
-		WithWorkdir("/src").
-		WithExec([]string{"grype", "sbom:sbom.json", "-o", "table", "--fail-on", "critical"})
+		From("golang:1.25").
+		WithExec([]string{"sh", "-c",
+			"curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin"},
+		).
+		WithMountedFile("/sbom.json", sbom).
+		WithWorkdir("/").
+		WithExec([]string{"grype", "sbom:/sbom.json", "-o", "table", "--fail-on", "critical"})
 
 	out, err := grype.Stdout(ctx)
 	if err != nil {

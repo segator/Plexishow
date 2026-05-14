@@ -37,10 +37,10 @@ jobs:
       - name: Build (Dagger)
         run: mage build
 
-      - name: SBOM (Dagger)
+      - name: SBOM
         run: mage sbom
 
-      - name: Vulnerability Scan (Dagger)
+      - name: Vulnerability Scan
         run: mage vulnscan
 
       - name: Upload SBOM
