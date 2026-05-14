@@ -11,11 +11,7 @@ on:
 permissions:
   contents: write
   packages: write
-
-env:
-  _EXPERIMENTAL_DAGGER_CACHE_CONFIG: "type=registry,ref=ghcr.io/segator/plexishow:dagger-cache,mode=max"
-  GHCR_USER: ${{ github.actor }}
-  GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  security-events: write
 
 jobs:
   pipeline:
@@ -35,7 +31,7 @@ jobs:
         run: mage lint
 
       - name: Test + Coverage
-        run: mage cover
+        run: mage test
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
@@ -52,6 +48,12 @@ jobs:
 
       - name: Vulnerability Scan
         run: mage vulnscan
+
+      - name: Upload vulnerability report to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: vulns.sarif
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4

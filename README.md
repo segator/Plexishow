@@ -218,22 +218,22 @@ Plexishow exposes Prometheus-compatible metrics at `/metrics`.
 ## Development
 
 ```bash
-# Run tests (inside Dagger)
+# Run tests
 mage test
 
-# Run tests with coverage gate (inside Dagger)
-mage cover
+# Run tests with coverage gate
+mage test
 
-# Run linter (inside Dagger)
+# Run linter
 mage lint
 
-# Build binary (inside Dagger)
+# Build binary
 mage build
 
-# Build Docker image (inside Dagger)
+# Build Docker image
 mage docker
 
-# Build GPU Docker image (inside Dagger)
+# Build GPU Docker image
 mage dockerGPU
 
 # Run linter
@@ -245,31 +245,12 @@ mage fmt
 # Clean build artifacts
 mage clean
 
-# Generate SBOM (inside Dagger)
+# Generate SBOM
 mage sbom
 
-# Scan for vulnerabilities (inside Dagger)
+# Scan for vulnerabilities
 mage vulnscan
 ```
-
-### Dagger Build System
-
-Builds and tests run inside **Dagger** containers for reproducibility.
-The magefile uses **cache volumes** for Go module and build caches:
-
-- `go-mod-cache` — Go module download cache
-- `go-build-cache` — Go build/compilation cache
-
-#### Remote Registry Cache
-
-All Dagger operations share a remote **registry cache** via `_EXPERIMENTAL_DAGGER_CACHE_CONFIG`
-(set automatically in `magefile.go` `init()`). BuildKit cache layers are pushed/pulled to/from
-`ghcr.io/segator/plexishow:dagger-cache`.
-
-**Requirements:**
-- `docker login ghcr.io` with a token that has `read:packages` + `write:packages`
-
-No external services required — everything runs locally or in CI.
 
 ---
 
@@ -305,12 +286,17 @@ The project uses a single GitHub Actions workflow (`.github/workflows/ci.yaml`) 
 ### Pipeline Steps
 
 1. **Format** — `mage fmt` + `git diff --exit-code`
-2. **Lint** — `mage lint` (golangci-lint inside Dagger)
-3. **Test + Coverage** — `mage cover` (race detector + 40% threshold)
+2. **Lint** — `mage lint` (golangci-lint)
+3. **Test + Coverage** — `mage test` (race detector + 40% threshold)
 4. **Build** — `mage build` (binary export)
 5. **SBOM** — `mage sbom` (Syft SPDX JSON)
 6. **Vulnerability Scan** — `mage vulnscan` (Grype, fails on critical)
-7. **Publish Dev Image** — `mage docker` pushed to GHCR (only on `main` pushes)
+7. **Vulnerability Report** — SARIF uploaded to GitHub Security tab (`upload-sarif`)
+8. **Publish Dev Image** — `mage docker` pushed to GHCR (only on `main` pushes)
+
+### Security Scan (Weekly)
+
+A separate workflow (`.github/workflows/security.yaml`) runs every **Monday at 03:00 UTC** and on demand (`workflow_dispatch`). It builds the SBOM, scans for vulnerabilities with Grype, and uploads the SARIF report to the GitHub Security tab.
 
 ### Release
 
