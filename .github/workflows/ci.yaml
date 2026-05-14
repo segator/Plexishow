@@ -8,7 +8,6 @@ on:
   workflow_dispatch:
 
 env:
-  # Dagger Cloud token for cache sharing (optional, free at dagger.io/cloud)
   DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
 
 jobs:
@@ -17,15 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: jdx/mise-action@v2
         with:
-          go-version: "1.22"
-
-      - name: Install Mage
-        run: go install github.com/magefile/mage@latest
-
-      - name: Install Dagger CLI
-        run: curl -L https://dl.dagger.io/dagger/install.sh | sh
+          experimental: true
 
       - name: Format Check
         run: |
@@ -71,13 +64,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: jdx/mise-action@v2
         with:
-          go-version: "1.22"
-      - name: Install Mage
-        run: go install github.com/magefile/mage@latest
-      - name: Install Dagger CLI
-        run: curl -L https://dl.dagger.io/dagger/install.sh | sh
+          experimental: true
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
