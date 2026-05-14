@@ -90,11 +90,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initial m3u fetch: %v\n", err)
 		os.Exit(1)
 	}
-	chs := st.All()
-	fmt.Printf("Loaded %d channels\n", len(chs))
-	for _, c := range chs {
-		fmt.Printf("  - %s (%s) -> %s\n", c.Name, c.Group, c.URL)
-	}
 	fetcher.Start()
 
 	var epgSource *epg.Source
@@ -124,6 +119,13 @@ func main() {
 		baseURL = defaultBaseURL(cfg.ListenAddr)
 	}
 	fmt.Println("Base URL:", baseURL)
+
+	chs := st.All()
+	fmt.Printf("Loaded %d channels\n", len(chs))
+	for _, c := range chs {
+		fmt.Printf("  - %s (%s) -> %s/stream/%s\n", c.Name, c.Group, baseURL, c.ID)
+	}
+
 	srv := server.New(baseURL, st, streamer, epgSource, metricsReg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
