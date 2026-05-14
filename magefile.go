@@ -166,6 +166,16 @@ func VulnScan(ctx context.Context) error {
 	return sh.RunV("grype", "sbom:sbom.json", "-o", "table", "--fail-on", "critical")
 }
 
+// Govulncheck runs the official Go vulnerability scanner and generates SARIF.
+func Govulncheck(ctx context.Context) error {
+	fmt.Println("Running govulncheck...")
+	out, err := sh.Output("govulncheck", "-format=sarif", "./...")
+	if err != nil {
+		return fmt.Errorf("govulncheck: %w", err)
+	}
+	return os.WriteFile("govulncheck.sarif", []byte(out), 0644)
+}
+
 // Lint runs golangci-lint
 func Lint(ctx context.Context) error {
 	fmt.Println("Running golangci-lint...")
@@ -175,7 +185,7 @@ func Lint(ctx context.Context) error {
 // Clean removes build artifacts
 func Clean() error {
 	fmt.Println("Cleaning...")
-	for _, p := range []string{"bin", "sbom.json", "coverage.out", "vulns.sarif"} {
+	for _, p := range []string{"bin", "sbom.json", "coverage.out", "vulns.sarif", "govulncheck.sarif"} {
 		if err := sh.Rm(p); err != nil {
 			return err
 		}

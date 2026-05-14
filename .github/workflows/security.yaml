@@ -16,8 +16,20 @@ jobs:
       - uses: jdx/mise-action@v2
       - run: go mod download
 
+      - name: govulncheck
+        run: mage govulncheck
+
+      - name: CodeQL Init
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+          build-mode: manual
+
       - name: Build binary
         run: mage bin:build
+
+      - name: CodeQL Analyze
+        uses: github/codeql-action/analyze@v3
 
       - name: SBOM
         run: mage sbom
@@ -25,7 +37,13 @@ jobs:
       - name: Vulnerability Scan
         run: mage vulnscan
 
-      - name: Upload vulnerability report to GitHub Security
+      - name: Upload govulncheck SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: govulncheck.sarif
+
+      - name: Upload Grype SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:

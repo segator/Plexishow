@@ -218,29 +218,29 @@ Plexishow exposes Prometheus-compatible metrics at `/metrics`.
 ## Development
 
 ```bash
-# Run tests
-mage test
-
-# Run tests with coverage gate
+# Run tests (race + coverage gate)
 mage test
 
 # Run linter
 mage lint
 
 # Build binary
-mage build
+mage bin:build
 
-# Build Docker image
-mage docker
+# Run binary locally
+mage run
 
-# Build GPU Docker image
-mage dockerGPU
+# Build Docker images (standard + GPU)
+mage docker:build
 
-# Run linter
-mage vet
+# Publish Docker images
+mage docker:publish
 
 # Format code
 mage fmt
+
+# Vet code
+mage vet
 
 # Clean build artifacts
 mage clean
@@ -248,8 +248,17 @@ mage clean
 # Generate SBOM
 mage sbom
 
-# Scan for vulnerabilities
+# Scan for vulnerabilities (Grype)
 mage vulnscan
+
+# Scan for Go vulnerabilities (govulncheck)
+mage govulncheck
+
+# Release snapshot
+mage releaseSnapshot
+
+# Full pipeline
+mage all
 ```
 
 ---
@@ -288,15 +297,18 @@ The project uses a single GitHub Actions workflow (`.github/workflows/ci.yaml`) 
 1. **Format** — `mage fmt` + `git diff --exit-code`
 2. **Lint** — `mage lint` (golangci-lint)
 3. **Test + Coverage** — `mage test` (race detector + 40% threshold)
-4. **Build** — `mage build` (binary export)
-5. **SBOM** — `mage sbom` (Syft SPDX JSON)
-6. **Vulnerability Scan** — `mage vulnscan` (Grype, fails on critical)
-7. **Vulnerability Report** — SARIF uploaded to GitHub Security tab (`upload-sarif`)
-8. **Publish Dev Image** — `mage docker` pushed to GHCR (only on `main` pushes)
+4. **govulncheck** — `mage govulncheck` (official Go vulnerability scanner, SARIF)
+5. **CodeQL** — Static analysis for Go security and quality
+6. **Build** — `mage bin:build` (binary export)
+7. **Docker** — `mage docker:build` (standard + GPU images)
+8. **SBOM** — `mage sbom` (Syft SPDX JSON)
+9. **Vulnerability Scan** — `mage vulnscan` (Grype, fails on critical)
+10. **Security Reports** — SARIF uploads to GitHub Security tab
+11. **Publish** — `mage docker:publish` to GHCR (only on `main` pushes)
 
 ### Security Scan (Weekly)
 
-A separate workflow (`.github/workflows/security.yaml`) runs every **Monday at 03:00 UTC** and on demand (`workflow_dispatch`). It builds the SBOM, scans for vulnerabilities with Grype, and uploads the SARIF report to the GitHub Security tab.
+A separate workflow (`.github/workflows/security.yaml`) runs every **Monday at 03:00 UTC** and on demand. It runs CodeQL, govulncheck, Grype, and uploads all SARIF reports to the GitHub Security tab.
 
 ### Release
 

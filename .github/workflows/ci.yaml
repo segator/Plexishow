@@ -29,7 +29,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-
       - name: Format
         run: |
           mage fmt
@@ -41,8 +40,20 @@ jobs:
       - name: Test
         run: mage test
 
+      - name: govulncheck
+        run: mage govulncheck
+
+      - name: CodeQL Init
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+          build-mode: manual
+
       - name: Build binary
         run: mage bin:build
+
+      - name: CodeQL Analyze
+        uses: github/codeql-action/analyze@v3
 
       - name: Build Docker images
         run: mage docker:build
@@ -53,7 +64,13 @@ jobs:
       - name: Vulnerability Scan
         run: mage vulnscan
 
-      - name: Report vulnerability scan
+      - name: Upload govulncheck SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: govulncheck.sarif
+
+      - name: Upload Grype SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
