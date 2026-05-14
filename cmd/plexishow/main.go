@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"syscall"
@@ -91,6 +92,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "load config: %v\n", err)
 		os.Exit(1)
 	}
+
+	if _, err := exec.LookPath(cfg.FFmpegPath); err != nil {
+		fmt.Fprintf(os.Stderr, "ffmpeg not found: %v\n", err)
+		fmt.Fprintln(os.Stderr, "Install ffmpeg and ensure it is in your PATH, or set -ffmpeg-path")
+		os.Exit(1)
+	}
+	fmt.Println("ffmpeg:", cfg.FFmpegPath)
 
 	st := store.New()
 
