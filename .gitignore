@@ -2,7 +2,8 @@
 /dist/
 *.test
 *.out
-.env
+# local environment overrides (DAGGER_CLOUD_TOKEN, etc.)
+/.env
 .idea/
 .vscode/
 coverage.html

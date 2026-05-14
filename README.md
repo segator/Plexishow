@@ -252,6 +252,28 @@ mage sbom
 mage vulnscan
 ```
 
+### Dagger Cache
+
+Plexishow uses **Dagger** to run builds and tests in containers. By default, every run starts
+from scratch. To enable **cache sharing** between CI and local development:
+
+1. Sign up at [dagger.io/cloud](https://dagger.io/cloud) (free)
+2. Get your API token from the Dagger Cloud dashboard
+3. Copy `.env.example` to `.env` and add your token:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add: DAGGER_CLOUD_TOKEN=your_token_here
+   ```
+
+direnv automatically loads `.env` when you enter the project directory,
+so Dagger will use the shared cache. This makes repeated `mage test`
+and `mage build` runs significantly faster.
+
+**GitHub Actions:** The CI workflow reads `DAGGER_CLOUD_TOKEN` from
+the repository's `Actions secrets`. Add your Dagger Cloud token as
+a repository secret named `DAGGER_CLOUD_TOKEN` in:
+`Settings → Secrets and variables → Actions`.
+
 ---
 
 ## Release
