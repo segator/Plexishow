@@ -11,6 +11,7 @@ import (
 type Config struct {
 	M3UURL          string        `yaml:"m3u_url"`
 	EPGURL          string        `yaml:"epg_url"`
+	BaseURL         string        `yaml:"base_url"`
 	ListenAddr      string        `yaml:"listen_addr"`
 	MaxStreams      int           `yaml:"max_streams"`
 	StreamTimeout   time.Duration `yaml:"stream_timeout"`

@@ -15,6 +15,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv(envPrefix + "EPG_URL"); v != "" {
 		cfg.EPGURL = v
 	}
+	if v := os.Getenv(envPrefix + "BASE_URL"); v != "" {
+		cfg.BaseURL = v
+	}
 	if v := os.Getenv(envPrefix + "LISTEN_ADDR"); v != "" {
 		cfg.ListenAddr = v
 	}

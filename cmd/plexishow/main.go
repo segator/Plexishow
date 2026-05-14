@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,10 +24,23 @@ import (
 // version is set at build time via -ldflags "-X main.version=$(VERSION)"
 var version = "dev" //nolint:unused
 
+func defaultBaseURL(listenAddr string) string {
+	host, port, err := net.SplitHostPort(listenAddr)
+	if err != nil {
+		// IPv6 or missing port fallback
+		return "http://localhost" + listenAddr
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	return fmt.Sprintf("http://%s:%s", host, port)
+}
+
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to config file")
 	m3uURL := flag.String("m3u-url", "", "M3U playlist URL (overrides config/env)")
 	epgURL := flag.String("epg-url", "", "EPG XMLTV URL (overrides config/env)")
+	baseURLFlag := flag.String("base-url", "", "Base URL advertised to clients (overrides config/env)")
 	listenAddr := flag.String("listen-addr", "", "HTTP listen address (overrides config/env)")
 	maxStreams := flag.Int("max-streams", 0, "Max concurrent streams (overrides config/env)")
 	streamTimeout := flag.String("stream-timeout", "", "Per-stream idle timeout (overrides config/env)")
@@ -43,6 +57,9 @@ func main() {
 	}
 	if *epgURL != "" {
 		flags["epg_url"] = *epgURL
+	}
+	if *baseURLFlag != "" {
+		flags["base_url"] = *baseURLFlag
 	}
 	if *listenAddr != "" {
 		flags["listen_addr"] = *listenAddr
@@ -77,7 +94,7 @@ func main() {
 
 	st := store.New()
 
-	fetcher := m3u.NewFetcher(*cfg, st)
+	fetcher := m3u.NewFetcher(cfg, st)
 	if err := fetcher.Pull(); err != nil {
 		fmt.Fprintf(os.Stderr, "initial m3u fetch: %v\n", err)
 		os.Exit(1)
@@ -106,7 +123,11 @@ func main() {
 
 	streamer := stream.NewManager(*cfg, st, metricsReg)
 
-	baseURL := fmt.Sprintf("http://%s", cfg.ListenAddr)
+	baseURL := cfg.BaseURL
+	if baseURL == "" {
+		baseURL = defaultBaseURL(cfg.ListenAddr)
+	}
+	fmt.Println("Base URL:", baseURL)
 	srv := server.New(baseURL, st, streamer, epgSource, metricsReg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

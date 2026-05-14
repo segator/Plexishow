@@ -16,12 +16,12 @@ type ChannelStore interface {
 }
 
 type Fetcher struct {
-	cfg    config.Config
+	cfg    *config.Config
 	store  ChannelStore
 	client *http.Client
 }
 
-func NewFetcher(cfg config.Config, s ChannelStore) *Fetcher {
+func NewFetcher(cfg *config.Config, s ChannelStore) *Fetcher {
 	return &Fetcher{
 		cfg:    cfg,
 		store:  s,

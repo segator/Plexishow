@@ -15,6 +15,9 @@ func applyFlags(cfg *Config, flags map[string]string) {
 	if v, ok := flags["epg_url"]; ok {
 		cfg.EPGURL = v
 	}
+	if v, ok := flags["base_url"]; ok {
+		cfg.BaseURL = v
+	}
 	if v, ok := flags["listen_addr"]; ok {
 		cfg.ListenAddr = v
 	}

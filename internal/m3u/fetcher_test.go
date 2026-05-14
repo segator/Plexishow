@@ -38,7 +38,7 @@ http://s/stream.mpd
 	defer srv.Close()
 
 	st := &fakeStore{}
-	f := NewFetcher(config.Config{
+	f := NewFetcher(&config.Config{
 		M3UURL:         srv.URL,
 		DefaultHeaders: config.Headers{Token: "abc", Referer: "ref", UserAgent: "ua"},
 		StreamTimeout:  5 * time.Second,
