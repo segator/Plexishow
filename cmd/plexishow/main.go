@@ -46,10 +46,6 @@ func main() {
 	maxStreams := flag.Int("max-streams", 0, "Max concurrent streams (overrides config/env)")
 	streamTimeout := flag.String("stream-timeout", "", "Per-stream idle timeout (overrides config/env)")
 	refreshInterval := flag.String("refresh-interval", "", "M3U refresh interval (overrides config/env)")
-	ffmpegPath := flag.String("ffmpeg-path", "", "Path to ffmpeg binary (overrides config/env)")
-	token := flag.String("token", "", "X-TCDN-token header value (overrides config/env)")
-	referer := flag.String("referer", "", "Referer header value (overrides config/env)")
-	userAgent := flag.String("user-agent", "", "User-Agent header value (overrides config/env)")
 	flag.Parse()
 
 	flags := make(map[string]string)
@@ -73,18 +69,6 @@ func main() {
 	}
 	if *refreshInterval != "" {
 		flags["refresh_interval"] = *refreshInterval
-	}
-	if *ffmpegPath != "" {
-		flags["ffmpeg_path"] = *ffmpegPath
-	}
-	if *token != "" {
-		flags["token"] = *token
-	}
-	if *referer != "" {
-		flags["referer"] = *referer
-	}
-	if *userAgent != "" {
-		flags["user_agent"] = *userAgent
 	}
 
 	cfg, err := config.Load(*configPath, flags)

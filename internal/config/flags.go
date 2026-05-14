@@ -36,16 +36,4 @@ func applyFlags(cfg *Config, flags map[string]string) {
 			cfg.RefreshInterval = d
 		}
 	}
-	if v, ok := flags["ffmpeg_path"]; ok {
-		cfg.FFmpegPath = v
-	}
-	if v, ok := flags["token"]; ok {
-		cfg.DefaultHeaders.Token = v
-	}
-	if v, ok := flags["referer"]; ok {
-		cfg.DefaultHeaders.Referer = v
-	}
-	if v, ok := flags["user_agent"]; ok {
-		cfg.DefaultHeaders.UserAgent = v
-	}
 }

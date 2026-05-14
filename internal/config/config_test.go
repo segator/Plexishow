@@ -45,10 +45,10 @@ default_headers:
 func TestLoadFromEnvOverridesFile(t *testing.T) {
 	os.Setenv("PLEXISHOW_M3U_URL", "http://env.com/m3u")
 	os.Setenv("PLEXISHOW_MAX_STREAMS", "8")
-	os.Setenv("PLEXISHOW_DEFAULT_HEADERS_TOKEN", "env-token")
+	os.Setenv("PLEXISHOW_BASE_URL", "http://env.com")
 	defer os.Unsetenv("PLEXISHOW_M3U_URL")
 	defer os.Unsetenv("PLEXISHOW_MAX_STREAMS")
-	defer os.Unsetenv("PLEXISHOW_DEFAULT_HEADERS_TOKEN")
+	defer os.Unsetenv("PLEXISHOW_BASE_URL")
 
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
@@ -67,8 +67,8 @@ max_streams: 2
 	if cfg.MaxStreams != 8 {
 		t.Errorf("env should override file: got %d", cfg.MaxStreams)
 	}
-	if cfg.DefaultHeaders.Token != "env-token" {
-		t.Errorf("nested env should work: got %s", cfg.DefaultHeaders.Token)
+	if cfg.BaseURL != "http://env.com" {
+		t.Errorf("env should override file: got %s", cfg.BaseURL)
 	}
 }
 

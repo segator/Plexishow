@@ -80,9 +80,6 @@ default_headers:
 | `PLEXISHOW_STREAM_TIMEOUT` | Per-stream idle timeout (default `30s`) |
 | `PLEXISHOW_REFRESH_INTERVAL` | M3U refresh interval (default `1h`) |
 | `PLEXISHOW_FFMPEG_PATH` | Path to ffmpeg binary (default `ffmpeg`) |
-| `PLEXISHOW_DEFAULT_HEADERS_TOKEN` | Default X-TCDN-token header |
-| `PLEXISHOW_DEFAULT_HEADERS_REFERER` | Default Referer header |
-| `PLEXISHOW_DEFAULT_HEADERS_USER_AGENT` | Default User-Agent header |
 
 ### CLI Flags
 
@@ -93,6 +90,8 @@ default_headers:
     M3U playlist URL (overrides config/env)
 -epg-url string
     EPG XMLTV URL (overrides config/env)
+-base-url string
+    Base URL advertised to clients (overrides config/env)
 -listen-addr string
     HTTP listen address (overrides config/env)
 -max-streams int
@@ -101,14 +100,6 @@ default_headers:
     Per-stream idle timeout (overrides config/env)
 -refresh-interval string
     M3U refresh interval (overrides config/env)
--ffmpeg-path string
-    Path to ffmpeg binary (overrides config/env)
--token string
-    X-TCDN-token header value (overrides config/env)
--referer string
-    Referer header value (overrides config/env)
--user-agent string
-    User-Agent header value (overrides config/env)
 ```
 
 ---

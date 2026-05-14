@@ -39,13 +39,4 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv(envPrefix + "FFMPEG_PATH"); v != "" {
 		cfg.FFmpegPath = v
 	}
-	if v := os.Getenv(envPrefix + "DEFAULT_HEADERS_TOKEN"); v != "" {
-		cfg.DefaultHeaders.Token = v
-	}
-	if v := os.Getenv(envPrefix + "DEFAULT_HEADERS_REFERER"); v != "" {
-		cfg.DefaultHeaders.Referer = v
-	}
-	if v := os.Getenv(envPrefix + "DEFAULT_HEADERS_USER_AGENT"); v != "" {
-		cfg.DefaultHeaders.UserAgent = v
-	}
 }
