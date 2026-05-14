@@ -19,16 +19,15 @@ env:
   OTEL_RESOURCE_ATTRIBUTES: "service.name=plexishow,ci.branch=${{ github.head_ref || github.ref_name }},ci.run=${{ github.run_id }}"
 
 jobs:
-  quality:
+  pipeline:
     runs-on: ubuntu-latest
     if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
-      - name: Download Go dependencies
-        run: go mod download
+      - run: go mod download
 
-      - name: Format Check
+      - name: Format
         run: |
           mage fmt
           git diff --exit-code -- '*.go' || { echo "Run 'mage fmt' locally"; exit 1; }
@@ -36,7 +35,7 @@ jobs:
       - name: Lint
         run: mage lint
 
-      - name: Coverage
+      - name: Test + Coverage
         run: mage cover
 
       - name: Upload Coverage
@@ -62,21 +61,16 @@ jobs:
           name: sbom
           path: sbom.json
 
-  publish-dev:
-    runs-on: ubuntu-latest
-    needs: quality
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-      - name: Download Go dependencies
-        run: go mod download
-      - uses: docker/login-action@v3
+      - name: Publish Dev Image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and Publish Dev Image
+
+      - name: Push to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: mage docker
         env:
           VERSION: dev
