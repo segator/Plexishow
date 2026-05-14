@@ -55,6 +55,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	args := buildArgs(ch)
+	fmt.Printf("[stream] %s: %s %s\n", ch.Name, m.cfg.FFmpegPath, strings.Join(args, " "))
 	//#nosec G204 -- ffmpeg path from config, intentional
 	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
 
