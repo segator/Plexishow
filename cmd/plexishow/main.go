@@ -98,7 +98,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Install ffmpeg and ensure it is in your PATH, or set -ffmpeg-path")
 		os.Exit(1)
 	}
-	fmt.Println("ffmpeg:", cfg.FFmpegPath)
 
 	st := store.New()
 

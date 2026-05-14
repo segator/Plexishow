@@ -45,7 +45,7 @@ func applyDefaults(cfg *Config) {
 	cfg.ListenAddr = ":8080"
 	cfg.MaxStreams = 4
 	cfg.StreamTimeout = 30 * time.Second
-	cfg.RefreshInterval = 1 * time.Hour
+	cfg.RefreshInterval = 5 * time.Minute
 	cfg.FFmpegPath = "ffmpeg"
 }
 
