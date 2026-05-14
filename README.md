@@ -248,11 +248,8 @@ mage clean
 # Generate SBOM
 mage sbom
 
-# Scan for vulnerabilities (Grype)
-mage vulnscan
-
-# Scan for Go vulnerabilities (govulncheck)
-mage govulncheck
+# Security scan (govulncheck + SBOM + Grype)
+mage security
 
 # Release snapshot
 mage releaseSnapshot
@@ -297,18 +294,14 @@ The project uses a single GitHub Actions workflow (`.github/workflows/ci.yaml`) 
 1. **Format** — `mage fmt` + `git diff --exit-code`
 2. **Lint** — `mage lint` (golangci-lint)
 3. **Test + Coverage** — `mage test` (race detector + 40% threshold)
-4. **govulncheck** — `mage govulncheck` (official Go vulnerability scanner, SARIF)
-5. **CodeQL** — Static analysis for Go security and quality
-6. **Build** — `mage bin:build` (binary export)
-7. **Docker** — `mage docker:build` (standard + GPU images)
-8. **SBOM** — `mage sbom` (Syft SPDX JSON)
-9. **Vulnerability Scan** — `mage vulnscan` (Grype, fails on critical)
-10. **Security Reports** — SARIF uploads to GitHub Security tab
-11. **Publish** — `mage docker:publish` to GHCR (only on `main` pushes)
+4. **Security** — `mage security` (govulncheck + SBOM + Grype with SARIF reports)
+5. **Upload Reports** — SARIF reports uploaded to GitHub Security tab
+6. **Docker** — `mage docker:build` (standard + GPU images)
+7. **Publish** — `mage docker:publish` to GHCR (only on `main` pushes)
 
 ### Security Scan (Weekly)
 
-A separate workflow (`.github/workflows/security.yaml`) runs every **Monday at 03:00 UTC** and on demand. It runs CodeQL, govulncheck, Grype, and uploads all SARIF reports to the GitHub Security tab.
+A separate workflow (`.github/workflows/security.yaml`) runs every **Monday at 03:00 UTC** and on demand. It runs `mage security` and uploads SARIF reports to the GitHub Security tab.
 
 ### Release
 

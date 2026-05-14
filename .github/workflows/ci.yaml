@@ -40,38 +40,17 @@ jobs:
       - name: Test
         run: mage test
 
-      - name: govulncheck
-        run: mage govulncheck
+      - name: Security Scan
+        run: mage security
 
-      - name: CodeQL Init
-        uses: github/codeql-action/init@v3
+      - name: Upload Security Reports
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          languages: go
-          build-mode: none
-
-      - name: CodeQL Analyze
-        uses: github/codeql-action/analyze@v3
+          sarif_file: security-reports/
 
       - name: Build Docker images
         run: mage docker:build
-
-      - name: SBOM
-        run: mage sbom
-
-      - name: Vulnerability Scan
-        run: mage vulnscan
-
-      - name: Upload govulncheck SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: govulncheck.sarif
-
-      - name: Upload Grype SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: vulns.sarif
 
       - name: Publish Docker images
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

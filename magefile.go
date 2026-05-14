@@ -138,42 +138,47 @@ func ReleaseSnapshot() error {
 	return sh.RunV("goreleaser", "release", "--snapshot", "--clean")
 }
 
-// Sbom generates SBOM using Syft (depends on bin:build)
-func Sbom(ctx context.Context) error {
-	mg.Deps(Bin.Build)
-	fmt.Println("Generating SBOM...")
-	out, err := sh.Output("syft", "file:bin/"+binaryName, "-o", "spdx-json")
-	if err != nil {
-		return fmt.Errorf("syft: %w", err)
-	}
-	return os.WriteFile("sbom.json", []byte(out), 0644)
-}
-
-// VulnScan scans the SBOM for vulnerabilities using Grype.
-// Generates vulns.sarif for GitHub Security and prints a table summary.
-func VulnScan(ctx context.Context) error {
-	mg.Deps(Sbom)
-	fmt.Println("Generating SARIF vulnerability report...")
-	sarif, err := sh.Output("grype", "sbom:sbom.json", "-o", "sarif")
-	if err != nil {
-		return fmt.Errorf("grype sarif: %w", err)
-	}
-	if err := os.WriteFile("vulns.sarif", []byte(sarif), 0644); err != nil {
+// Security runs govulncheck, generates SBOM, and scans with Grype.
+// Writes reports to security-reports/ for GitHub Security upload.
+func Security(ctx context.Context) error {
+	if err := os.MkdirAll("security-reports", 0755); err != nil {
 		return err
 	}
 
-	fmt.Println("Scanning for vulnerabilities...")
-	return sh.RunV("grype", "sbom:sbom.json", "-o", "table", "--fail-on", "critical")
-}
-
-// Govulncheck runs the official Go vulnerability scanner and generates SARIF.
-func Govulncheck(ctx context.Context) error {
+	// 1. govulncheck
 	fmt.Println("Running govulncheck...")
 	out, err := sh.Output("govulncheck", "-format=sarif", "./...")
 	if err != nil {
 		return fmt.Errorf("govulncheck: %w", err)
 	}
-	return os.WriteFile("govulncheck.sarif", []byte(out), 0644)
+	if err := os.WriteFile("security-reports/govulncheck.sarif", []byte(out), 0644); err != nil {
+		return err
+	}
+
+	// 2. SBOM (depends on binary)
+	mg.Deps(Bin.Build)
+	fmt.Println("Generating SBOM...")
+	sbomOut, err := sh.Output("syft", "file:bin/"+binaryName, "-o", "spdx-json")
+	if err != nil {
+		return fmt.Errorf("syft: %w", err)
+	}
+	if err := os.WriteFile("sbom.json", []byte(sbomOut), 0644); err != nil {
+		return err
+	}
+
+	// 3. Grype SARIF
+	fmt.Println("Scanning SBOM with Grype (SARIF)...")
+	sarif, err := sh.Output("grype", "sbom:sbom.json", "-o", "sarif")
+	if err != nil {
+		return fmt.Errorf("grype sarif: %w", err)
+	}
+	if err := os.WriteFile("security-reports/grype.sarif", []byte(sarif), 0644); err != nil {
+		return err
+	}
+
+	// 4. Grype table (for logs) with critical gate
+	fmt.Println("Scanning SBOM with Grype (table)...")
+	return sh.RunV("grype", "sbom:sbom.json", "-o", "table", "--fail-on", "critical")
 }
 
 // Lint runs golangci-lint
@@ -185,7 +190,7 @@ func Lint(ctx context.Context) error {
 // Clean removes build artifacts
 func Clean() error {
 	fmt.Println("Cleaning...")
-	for _, p := range []string{"bin", "sbom.json", "coverage.out", "vulns.sarif", "govulncheck.sarif"} {
+	for _, p := range []string{"bin", "sbom.json", "coverage.out", "security-reports"} {
 		if err := sh.Rm(p); err != nil {
 			return err
 		}
