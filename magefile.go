@@ -5,6 +5,8 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,12 +32,58 @@ func init() {
 			version = v
 		}
 	}
-	// Enable Dagger registry cache for ALL Dagger operations (Build, Test, Cover, Lint, Docker, ...)
-	// Respect _EXPERIMENTAL_DAGGER_CACHE_CONFIG if already set by CI.
+	// Enable Dagger registry cache for ALL Dagger operations.
 	if os.Getenv("_EXPERIMENTAL_DAGGER_CACHE_CONFIG") == "" {
 		os.Setenv("_EXPERIMENTAL_DAGGER_CACHE_CONFIG",
 			fmt.Sprintf("type=registry,ref=%s:dagger-cache,mode=max", imageName))
 	}
+	// Pass GHCR creds to Dagger engine so BuildKit can push/pull the cache.
+	// Precedence: DAGGER_REGISTRY_AUTH_ghcr.io env > GHCR_USER+GHCR_TOKEN > docker config.json.
+	if os.Getenv("DAGGER_REGISTRY_AUTH_ghcr.io") == "" {
+		user, token := os.Getenv("GHCR_USER"), os.Getenv("GHCR_TOKEN")
+		if user == "" || token == "" {
+			user, token = readDockerConfig("ghcr.io")
+		}
+		if user != "" && token != "" {
+			authJSON := fmt.Sprintf(`{"username":"%s","password":"%s"}`, user, token)
+			os.Setenv("DAGGER_REGISTRY_AUTH_ghcr.io", authJSON)
+		}
+	}
+}
+
+// readDockerConfig reads the auth entry for a registry from ~/.docker/config.json.
+// Returns username and password if found.
+func readDockerConfig(host string) (string, string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", ""
+	}
+	cfgPath := filepath.Join(home, ".docker", "config.json")
+	b, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return "", ""
+	}
+	var cfg struct {
+		Auths map[string]struct {
+			Auth string `json:"auth"`
+		} `json:"auths"`
+	}
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return "", ""
+	}
+	entry, ok := cfg.Auths[host]
+	if !ok || entry.Auth == "" {
+		return "", ""
+	}
+	decoded, err := base64.StdEncoding.DecodeString(entry.Auth)
+	if err != nil {
+		return "", ""
+	}
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], parts[1]
 }
 
 func goCacheVolumes(client *dagger.Client) (*dagger.CacheVolume, *dagger.CacheVolume) {
