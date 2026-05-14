@@ -23,10 +23,7 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: go
-          build-mode: manual
-
-      - name: Build binary
-        run: mage bin:build
+          build-mode: none
 
       - name: CodeQL Analyze
         uses: github/codeql-action/analyze@v3
