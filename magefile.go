@@ -92,19 +92,29 @@ func (Bin) Build(ctx context.Context) error {
 // Docker groups Docker image targets.
 type Docker mg.Namespace
 
-// Build builds the standard Docker image (depends on bin:build).
+// Build builds both the standard and GPU Docker images (depends on bin:build).
 func (Docker) Build(ctx context.Context) error {
 	mg.Deps(Bin.Build)
 	fmt.Println("Building Docker image...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
-	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile", ".")
+	if err := sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile", "."); err != nil {
+		return err
+	}
+	fmt.Println("Building GPU Docker image...")
+	gpuTag := fmt.Sprintf("%s:%s-gpu", imageName, version)
+	return sh.RunV("docker", "build", "-t", gpuTag, "-f", "Dockerfile.gpu", ".")
 }
 
-// Publish pushes the standard Docker image to the registry.
+// Publish pushes both the standard and GPU Docker images to the registry.
 func (Docker) Publish(ctx context.Context) error {
-	fmt.Println("Publishing Docker image...")
+	mg.Deps(Docker.Build, Docker.BuildGPU)
+	fmt.Println("Publishing Docker images...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
-	return sh.RunV("docker", "push", tag)
+	if err := sh.RunV("docker", "push", tag); err != nil {
+		return err
+	}
+	gpuTag := fmt.Sprintf("%s:%s-gpu", imageName, version)
+	return sh.RunV("docker", "push", gpuTag)
 }
 
 // BuildGPU builds the GPU Docker image (depends on bin:build).
@@ -113,13 +123,6 @@ func (Docker) BuildGPU(ctx context.Context) error {
 	fmt.Println("Building GPU Docker image...")
 	tag := fmt.Sprintf("%s:%s-gpu", imageName, version)
 	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile.gpu", ".")
-}
-
-// PublishGPU pushes the GPU Docker image to the registry.
-func (Docker) PublishGPU(ctx context.Context) error {
-	fmt.Println("Publishing GPU Docker image...")
-	tag := fmt.Sprintf("%s:%s-gpu", imageName, version)
-	return sh.RunV("docker", "push", tag)
 }
 
 // Release runs GoReleaser (local, needs git tags)

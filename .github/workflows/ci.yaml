@@ -44,7 +44,7 @@ jobs:
       - name: Build binary
         run: mage bin:build
 
-      - name: Build Docker image
+      - name: Build Docker images
         run: mage docker:build
 
       - name: SBOM
@@ -59,7 +59,7 @@ jobs:
         with:
           sarif_file: vulns.sarif
 
-      - name: Publish Docker image
+      - name: Publish Docker images
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: mage docker:publish
         env:
