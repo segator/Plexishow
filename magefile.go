@@ -30,6 +30,12 @@ func init() {
 			version = v
 		}
 	}
+	// Enable Dagger registry cache for ALL Dagger operations (Build, Test, Cover, Lint, Docker, ...)
+	// Respect _EXPERIMENTAL_DAGGER_CACHE_CONFIG if already set by CI.
+	if os.Getenv("_EXPERIMENTAL_DAGGER_CACHE_CONFIG") == "" {
+		os.Setenv("_EXPERIMENTAL_DAGGER_CACHE_CONFIG",
+			fmt.Sprintf("type=registry,ref=%s:dagger-cache,mode=max", imageName))
+	}
 }
 
 func goCacheVolumes(client *dagger.Client) (*dagger.CacheVolume, *dagger.CacheVolume) {
@@ -131,10 +137,11 @@ func Build(ctx context.Context) error {
 	return err
 }
 
-// Docker builds the Docker image inside Dagger and publishes it
+// Docker builds the Docker image inside Dagger.
 func Docker(ctx context.Context) error {
 	mg.Deps(Build)
 	fmt.Println("Building Docker image in Dagger...")
+
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
 	if err != nil {
 		return err
@@ -142,8 +149,6 @@ func Docker(ctx context.Context) error {
 	defer client.Close()
 
 	src := client.Host().Directory(".")
-	cacheTag := "ghcr.io/segator/plexishow:buildcache"
-
 	image := src.DockerBuild(dagger.DirectoryDockerBuildOpts{
 		Dockerfile: "Dockerfile",
 	})
@@ -153,18 +158,14 @@ func Docker(ctx context.Context) error {
 		return err
 	}
 	fmt.Println("Published:", addr)
-
-	_, err = image.Publish(ctx, cacheTag)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to push cache: %v\n", err)
-	}
 	return nil
 }
 
-// DockerGPU builds the GPU Docker image inside Dagger
+// DockerGPU builds the GPU Docker image inside Dagger.
 func DockerGPU(ctx context.Context) error {
 	mg.Deps(Build)
 	fmt.Println("Building GPU Docker image in Dagger...")
+
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
 	if err != nil {
 		return err
@@ -172,8 +173,6 @@ func DockerGPU(ctx context.Context) error {
 	defer client.Close()
 
 	src := client.Host().Directory(".")
-	cacheTag := "ghcr.io/segator/plexishow:buildcache-gpu"
-
 	image := src.DockerBuild(dagger.DirectoryDockerBuildOpts{
 		Dockerfile: "Dockerfile.gpu",
 	})
@@ -183,11 +182,6 @@ func DockerGPU(ctx context.Context) error {
 		return err
 	}
 	fmt.Println("Published:", addr)
-
-	_, err = image.Publish(ctx, cacheTag)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to push cache: %v\n", err)
-	}
 	return nil
 }
 
@@ -325,6 +319,17 @@ func Lint(ctx context.Context) error {
 	}
 	fmt.Println(out)
 	fmt.Println("Lint passed!")
+	return nil
+}
+
+// Clean removes build artifacts
+func Clean() error {
+	fmt.Println("Cleaning...")
+	for _, p := range []string{"bin", "sbom.json", "coverage.out"} {
+		if err := sh.Rm(p); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
