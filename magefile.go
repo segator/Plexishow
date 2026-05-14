@@ -94,7 +94,7 @@ type Docker mg.Namespace
 
 // Build builds the standard Docker image (depends on bin:build).
 func (Docker) Build(ctx context.Context) error {
-	mg.Deps(mg.F(Bin.Build, ctx))
+	mg.Deps(Bin.Build)
 	fmt.Println("Building Docker image...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
 	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile", ".")
@@ -109,7 +109,7 @@ func (Docker) Publish(ctx context.Context) error {
 
 // BuildGPU builds the GPU Docker image (depends on bin:build).
 func (Docker) BuildGPU(ctx context.Context) error {
-	mg.Deps(mg.F(Bin.Build, ctx))
+	mg.Deps(Bin.Build)
 	fmt.Println("Building GPU Docker image...")
 	tag := fmt.Sprintf("%s:%s-gpu", imageName, version)
 	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile.gpu", ".")
@@ -137,7 +137,7 @@ func ReleaseSnapshot() error {
 
 // Sbom generates SBOM using Syft (depends on bin:build)
 func Sbom(ctx context.Context) error {
-	mg.Deps(mg.F(Bin.Build, ctx))
+	mg.Deps(Bin.Build)
 	fmt.Println("Generating SBOM...")
 	out, err := sh.Output("syft", "file:bin/"+binaryName, "-o", "spdx-json")
 	if err != nil {
@@ -184,5 +184,5 @@ func Clean() error {
 func All(ctx context.Context) {
 	mg.Deps(Fmt, Vet)
 	mg.Deps(Test)
-	mg.Deps(mg.F(Bin.Build, ctx))
+	mg.Deps(Bin.Build)
 }
