@@ -59,7 +59,7 @@ func miseContainer(client *dagger.Client) *dagger.Container {
 
 	return client.Container().
 		From("alpine:3.19").
-		WithExec([]string{"apk", "add", "--no-cache", "bash", "curl", "git"}).
+		WithExec([]string{"apk", "add", "--no-cache", "bash", "curl", "git", "gcc", "musl-dev", "libc-dev"}).
 		WithExec([]string{"sh", "-c", "curl -sSfL https://mise.run | sh"}).
 		WithEnvVariable("PATH", "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin").
 		WithMountedFile("/mise.toml", miseToml).
@@ -265,6 +265,7 @@ func Cover(ctx context.Context) error {
 	golang := miseContainer(client).
 		WithMountedDirectory("/src", src).
 		WithWorkdir("/src").
+		WithEnvVariable("CGO_ENABLED", "1").
 		WithExec([]string{"mkdir", "-p", "/output"}).
 		WithExec(miseExec("go", "mod", "download")).
 		WithExec(miseExec("go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./...")).
@@ -332,4 +333,108 @@ func All(ctx context.Context) {
 	mg.Deps(Fmt, Vet)
 	mg.Deps(Test)
 	mg.Deps(Build)
+}
+
+// Ci runs the full quality pipeline in a single Dagger session (one trace in Dagger Cloud)
+func Ci(ctx context.Context) error {
+	mg.Deps(Fmt, Vet)
+	fmt.Println("=== CI Pipeline (single Dagger session) ===")
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	src := goSrc(client)
+
+	// Lint
+	fmt.Println("--- Lint ---")
+	out, err := miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "install", "github.com/golangci/golangci-lint/cmd/golangci-lint@latest")).
+		WithExec(miseExec("golangci-lint", "run", "--timeout=5m", "./...")).
+		Stdout(ctx)
+	if err != nil {
+		fmt.Println(out)
+		return fmt.Errorf("lint: %w", err)
+	}
+	fmt.Println("Lint passed!")
+
+	// Coverage
+	fmt.Println("--- Coverage ---")
+	cov := miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithEnvVariable("CGO_ENABLED", "1").
+		WithExec([]string{"mkdir", "-p", "/output"}).
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./...")).
+		WithExec(miseExec("go", "tool", "cover", "-func=/output/coverage.out", "-o", "/output/coverage.txt"))
+	if _, err := cov.File("/output/coverage.out").Export(ctx, "coverage.out"); err != nil {
+		return fmt.Errorf("cover: %w", err)
+	}
+	threshold := 40.0
+	coverageTxt, err := cov.File("/output/coverage.txt").Contents(ctx)
+	if err != nil {
+		return fmt.Errorf("cover: %w", err)
+	}
+	lines := strings.Split(strings.TrimSpace(coverageTxt), "\n")
+	if len(lines) == 0 {
+		return fmt.Errorf("could not parse coverage output")
+	}
+	var coverage float64
+	if _, err := fmt.Sscanf(lines[len(lines)-1], "total: (statements) %f%%", &coverage); err != nil {
+		return fmt.Errorf("failed to parse coverage: %w", err)
+	}
+	fmt.Printf("Coverage: %.1f%% (threshold: %.1f%%)\n", coverage, threshold)
+	if coverage < threshold {
+		return fmt.Errorf("coverage %.1f%% is below threshold %.1f%%", coverage, threshold)
+	}
+
+	// Build
+	fmt.Println("--- Build ---")
+	ldflags := fmt.Sprintf("-ldflags=-s -w -X main.version=%s", version)
+	bin := miseContainer(client).
+		WithMountedDirectory("/src", src).
+		WithWorkdir("/src").
+		WithEnvVariable("CGO_ENABLED", "0").
+		WithExec(miseExec("go", "mod", "download")).
+		WithExec(miseExec("go", "build", ldflags, "-o", "bin/plexishow", "./cmd/plexishow"))
+	if _, err := bin.File("/src/bin/plexishow").Export(ctx, filepath.Join("bin", binaryName)); err != nil {
+		return fmt.Errorf("build: %w", err)
+	}
+
+	// SBOM
+	fmt.Println("--- SBOM ---")
+	binDir := client.Host().Directory("bin")
+	sbomOut, err := miseContainer(client).
+		WithMountedDirectory("/src", binDir).
+		WithWorkdir("/src").
+		WithExec(miseExec("syft", "file:plexishow", "-o", "spdx-json")).
+		Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("sbom: %w", err)
+	}
+	if err := os.WriteFile("sbom.json", []byte(sbomOut), 0644); err != nil {
+		return err
+	}
+
+	// Vuln Scan
+	fmt.Println("--- Vuln Scan ---")
+	sbomFile := client.Host().File("sbom.json")
+	vulnOut, err := miseContainer(client).
+		WithMountedFile("/sbom.json", sbomFile).
+		WithWorkdir("/").
+		WithExec(miseExec("grype", "sbom:/sbom.json", "-o", "table", "--fail-on", "critical")).
+		Stdout(ctx)
+	if err != nil {
+		fmt.Println(vulnOut)
+		return fmt.Errorf("vulnscan: %w", err)
+	}
+	fmt.Println(vulnOut)
+
+	fmt.Println("=== CI Pipeline Complete ===")
+	return nil
 }

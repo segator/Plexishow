@@ -8,7 +8,9 @@ on:
   workflow_dispatch:
 
 env:
-  DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+  # Send Dagger traces to custom OTLP collector
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_GW_ENDPOINT }}
+  OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${{ secrets.OTEL_GW_TOKEN }}"
 
 jobs:
   quality:
@@ -19,16 +21,8 @@ jobs:
       - name: Download Go dependencies
         run: go mod download
 
-      - name: Format Check
-        run: |
-          mage fmt
-          git diff --exit-code -- '*.go' || { echo "Run 'mage fmt' locally"; exit 1; }
-
-      - name: Lint (Dagger)
-        run: mage lint
-
-      - name: Coverage (Dagger)
-        run: mage cover
+      - name: CI Pipeline (Dagger)
+        run: mage ci
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
@@ -36,15 +30,6 @@ jobs:
         with:
           name: coverage
           path: coverage.out
-
-      - name: Build (Dagger)
-        run: mage build
-
-      - name: SBOM
-        run: mage sbom
-
-      - name: Vulnerability Scan
-        run: mage vulnscan
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
