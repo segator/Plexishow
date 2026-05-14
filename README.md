@@ -262,22 +262,12 @@ The magefile uses **cache volumes** for Go module and build caches:
 
 #### Remote Registry Cache
 
-Docker image builds use Dagger's experimental **registry cache** via `_EXPERIMENTAL_DAGGER_CACHE_CONFIG`.
-This pushes/pulls BuildKit cache layers to/from GHCR automatically:
-
-```bash
-# The magefile sets this automatically, but you can override it:
-export _EXPERIMENTAL_DAGGER_CACHE_CONFIG="type=registry,ref=ghcr.io/segator/plexishow:buildcache,mode=max"
-mage docker
-```
+All Dagger operations share a remote **registry cache** via `_EXPERIMENTAL_DAGGER_CACHE_CONFIG`
+(set automatically in `magefile.go` `init()`). BuildKit cache layers are pushed/pulled to/from
+`ghcr.io/segator/plexishow:dagger-cache`.
 
 **Requirements:**
 - `docker login ghcr.io` with a token that has `read:packages` + `write:packages`
-- The Dagger engine reads this variable at startup (if the engine is already running, restart it with `docker stop dagger-engine-...`)
-
-Cache tags used:
-- `ghcr.io/segator/plexishow:buildcache` — standard image
-- `ghcr.io/segator/plexishow:buildcache-gpu` — GPU image
 
 No external services required — everything runs locally or in CI.
 
@@ -325,19 +315,6 @@ The project uses a single GitHub Actions workflow (`.github/workflows/ci.yaml`) 
 ### Release
 
 Tag pushes (`v*`) trigger GoReleaser via `.github/workflows/release-please.yaml`.
-
-### OpenTelemetry
-
-Traces are exported to a custom OTLP collector using these environment variables in CI:
-
-| Variable | Purpose |
-|----------|---------|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector URL |
-| `OTEL_EXPORTER_OTLP_HEADERS` | Auth header (`Authorization=Bearer <token>`) |
-| `OTEL_SERVICE_NAME` | `plexishow` |
-| `OTEL_RESOURCE_ATTRIBUTES` | `service.name=plexishow,ci.branch=...,ci.run=...` |
-
-> **Note on logs:** Dagger exports **traces** to OTLP endpoints, but it does **not** currently export container stdout/stderr as OTLP logs. Build output is streamed to the GitHub Actions log via `dagger.WithLogOutput(os.Stdout)` and can be correlated with traces using the `ci.run` attribute.
 
 ---
 

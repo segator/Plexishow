@@ -13,10 +13,6 @@ permissions:
   packages: write
 
 env:
-  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_GW_ENDPOINT }}
-  OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${{ secrets.OTEL_GW_TOKEN }}"
-  OTEL_SERVICE_NAME: "plexishow"
-  OTEL_RESOURCE_ATTRIBUTES: "service.name=plexishow,ci.branch=${{ github.head_ref || github.ref_name }},ci.run=${{ github.run_id }}"
   _EXPERIMENTAL_DAGGER_CACHE_CONFIG: "type=registry,ref=ghcr.io/segator/plexishow:dagger-cache,mode=max"
 
 jobs:
