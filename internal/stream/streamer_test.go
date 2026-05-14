@@ -83,7 +83,7 @@ func TestBuildArgsWithKey(t *testing.T) {
 	args := buildArgs(ch)
 	found := false
 	for i := 0; i < len(args)-1; i++ {
-		if args[i] == "-cenc_decryption_key" && args[i+1] == "kid1:key1" {
+		if args[i] == "-cenc_decryption_key" && args[i+1] == "key1" {
 			found = true
 			break
 		}

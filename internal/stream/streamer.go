@@ -167,8 +167,8 @@ func buildArgs(ch m3u.Channel) []string {
 
 	args = append(args, "-y")
 
-	if ch.KeyID != "" && ch.Key != "" {
-		args = append(args, "-cenc_decryption_key", fmt.Sprintf("%s:%s", ch.KeyID, ch.Key))
+	if ch.Key != "" {
+		args = append(args, "-cenc_decryption_key", ch.Key)
 	}
 
 	// ffmpeg has a dedicated -user_agent flag; everything else goes via -headers
