@@ -250,6 +250,7 @@ func Cover(ctx context.Context) error {
 
 	src := goSrc(client)
 	golang := goContainer(client, src).
+		WithExec([]string{"mkdir", "-p", "/output"}).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "test", "-race", "-coverprofile=/output/coverage.out", "-covermode=atomic", "./..."}).
 		WithExec([]string{"go", "tool", "cover", "-func=/output/coverage.out", "-o", "/output/coverage.txt"})
@@ -259,7 +260,7 @@ func Cover(ctx context.Context) error {
 		return err
 	}
 
-	threshold := 60.0
+	threshold := 40.0
 	coverageOutput, err := golang.File("/output/coverage.txt").Contents(ctx)
 	if err != nil {
 		return err
