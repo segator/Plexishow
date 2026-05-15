@@ -46,6 +46,7 @@ func main() {
 	maxStreams := flag.Int("max-streams", 0, "Max concurrent streams (overrides config/env)")
 	streamTimeout := flag.String("stream-timeout", "", "Per-stream idle timeout (overrides config/env)")
 	refreshInterval := flag.String("refresh-interval", "", "M3U refresh interval (overrides config/env)")
+	token := flag.String("token", "", "X-TCDN-token for all channels (overrides M3U stream_headers)")
 	flag.Parse()
 
 	flags := make(map[string]string)
@@ -69,6 +70,9 @@ func main() {
 	}
 	if *refreshInterval != "" {
 		flags["refresh_interval"] = *refreshInterval
+	}
+	if *token != "" {
+		flags["token"] = *token
 	}
 
 	cfg, err := config.Load(*configPath, flags)

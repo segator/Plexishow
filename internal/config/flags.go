@@ -36,4 +36,7 @@ func applyFlags(cfg *Config, flags map[string]string) {
 			cfg.RefreshInterval = d
 		}
 	}
+	if v, ok := flags["token"]; ok {
+		cfg.DefaultHeaders.Token = v
+	}
 }

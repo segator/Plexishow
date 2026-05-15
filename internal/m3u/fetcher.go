@@ -69,7 +69,7 @@ func (f *Fetcher) Pull() error {
 		if channels[i].Headers == nil {
 			channels[i].Headers = make(map[string]string)
 		}
-		if _, ok := channels[i].Headers["X-TCDN-token"]; !ok && f.cfg.DefaultHeaders.Token != "" {
+		if f.cfg.DefaultHeaders.Token != "" {
 			channels[i].Headers["X-TCDN-token"] = f.cfg.DefaultHeaders.Token
 		}
 		if _, ok := channels[i].Headers["Referer"]; !ok && f.cfg.DefaultHeaders.Referer != "" {
