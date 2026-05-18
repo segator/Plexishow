@@ -297,16 +297,16 @@ func TestBroadcastMultiplex(t *testing.T) {
 	sess := &session{
 		stdout: pr,
 		cancel: func() {},
-		subs:   make(map[chan []byte]struct{}),
+		subs:   make(map[chan []byte]string),
 		done:   make(chan struct{}),
 	}
 
 	ch1 := make(chan []byte, 10)
 	ch2 := make(chan []byte, 10)
-	if !sess.addSub(ch1) {
+	if !sess.addSub(ch1, "127.0.0.1") {
 		t.Fatal("addSub returned false for fresh session")
 	}
-	if !sess.addSub(ch2) {
+	if !sess.addSub(ch2, "127.0.0.2") {
 		t.Fatal("addSub returned false for fresh session")
 	}
 
@@ -351,7 +351,7 @@ func TestSessionIdleTimeout(t *testing.T) {
 		cmd:         cmd,
 		stdout:      stdout,
 		cancel:      func() { _ = cmd.Process.Kill() },
-		subs:        make(map[chan []byte]struct{}),
+		subs:        make(map[chan []byte]string),
 		done:        make(chan struct{}),
 		idleTimeout: 100 * time.Millisecond,
 	}
@@ -359,7 +359,7 @@ func TestSessionIdleTimeout(t *testing.T) {
 	go sess.broadcast(stderr, "test", "")
 
 	ch := make(chan []byte, 1)
-	if !sess.addSub(ch) {
+	if !sess.addSub(ch, "127.0.0.1") {
 		t.Fatal("addSub returned false for fresh session")
 	}
 	sess.removeSub(ch)
@@ -383,7 +383,7 @@ func TestSessionAddSubFalse(t *testing.T) {
 		done:   make(chan struct{}),
 	}
 	ch := make(chan []byte, 1)
-	if sess.addSub(ch) {
+	if sess.addSub(ch, "127.0.0.1") {
 		t.Fatal("addSub should return should return false when subs is nil")
 	}
 }

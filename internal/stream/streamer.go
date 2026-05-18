@@ -51,13 +51,13 @@ type session struct {
 	stdout      io.ReadCloser
 	cancel      context.CancelFunc
 	mu          sync.Mutex
-	subs        map[chan []byte]struct{}
+	subs        map[chan []byte]string
 	done        chan struct{}
 	idleTimer   *time.Timer
 	idleTimeout time.Duration
 }
 
-func (s *session) addSub(ch chan []byte) bool {
+func (s *session) addSub(ch chan []byte, ip string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.subs == nil {
@@ -67,7 +67,7 @@ func (s *session) addSub(ch chan []byte) bool {
 		s.idleTimer.Stop()
 		s.idleTimer = nil
 	}
-	s.subs[ch] = struct{}{}
+	s.subs[ch] = ip
 	return true
 }
 
@@ -129,6 +129,10 @@ func (s *session) broadcast(stderr io.ReadCloser, name string, logDir string) {
 			scanner := bufio.NewScanner(stderr)
 			for scanner.Scan() {
 				line := scanner.Text()
+				// Filter out harmless CENC seek warnings printed every segment to keep logs clean and save disk I/O
+				if strings.Contains(line, "Failed to seek for auxiliary info") {
+					continue
+				}
 				fmt.Printf("%s[%s]%s %s\n", color, name, ansiReset, line)
 				if logFile != nil {
 					_, _ = fmt.Fprintln(logFile, line)
@@ -195,7 +199,7 @@ func NewManager(cfg config.Config, st *store.Store, metrics *metrics.Registry) *
 }
 
 func (m *Manager) statsLogger() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		m.mu.Lock()
@@ -208,9 +212,16 @@ func (m *Manager) statsLogger() {
 					name = ch.Name
 				}
 				sess.mu.Lock()
-				subs := len(sess.subs)
+				ips := make([]string, 0, len(sess.subs))
+				for _, ip := range sess.subs {
+					ips = append(ips, ip)
+				}
 				sess.mu.Unlock()
-				stats = append(stats, fmt.Sprintf("%s (%d users)", name, subs))
+				if len(ips) > 0 {
+					stats = append(stats, fmt.Sprintf("%s (%d users: %s)", name, len(ips), strings.Join(ips, ", ")))
+				} else {
+					stats = append(stats, fmt.Sprintf("%s (0 users)", name))
+				}
 			}
 			fmt.Printf("\033[1;36m[stats] %d active streams:\033[0m %s\n", len(m.sessions), strings.Join(stats, ", "))
 		}
@@ -247,7 +258,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sess, exists := m.sessions[id]
 	m.mu.Unlock()
 
-	if !exists || !sess.addSub(chData) {
+	if !exists || !sess.addSub(chData, clientIP) {
 		// Session died between the unlock and addSub (or didn't exist)
 		select {
 		case m.sem <- struct{}{}:
@@ -263,7 +274,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to start stream", http.StatusInternalServerError)
 			return
 		}
-		sess.addSub(chData)
+		sess.addSub(chData, clientIP)
 	}
 	defer sess.removeSub(chData)
 
@@ -337,7 +348,7 @@ func (m *Manager) startSession(ch m3u.Channel) (*session, error) {
 		cmd:         cmd,
 		stdout:      stdout,
 		cancel:      cancel,
-		subs:        make(map[chan []byte]struct{}),
+		subs:        make(map[chan []byte]string),
 		done:        make(chan struct{}),
 		idleTimeout: defaultIdleTimeout,
 	}

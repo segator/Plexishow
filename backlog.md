@@ -56,6 +56,13 @@ This document acts as a persistent repository backlog of ideas, feature proposal
   * Meanwhile, Plexishow launches the real `ffmpeg` IPTV connection, parses the DASH playlist, decrypts CENC keys, and initializes transcoding.
   * Once the first live audio/video packet is successfully read from `ffmpeg`, the streaming session dynamically hot-swaps the packet output from the placeholder video to the live stream. This makes the player open the video instantly without stalling for 5-10 seconds.
 
+### 8. ⚡ Interceptor & Stripper de Manifiesto XML DASH (`suggestedPresentationDelay`)
+* **Goal**: Forzar a `ffmpeg` a sintonizar en el borde absoluto del directo, eliminando los 20 segundos de retraso por defecto (esencial para fútbol y deportes en vivo).
+* **Concept**:
+  * **El problema de latencia**: El proveedor de IPTV (Movistar+) añade a propósito una directiva XML en su manifiesto `.mpd` llamada `suggestedPresentationDelay="PT20S"`. Esto obliga por estándar a cualquier cliente (como `ffmpeg`) a sintonizar 20 segundos por detrás del directo real para dar margen a la red.
+  * **La solución**: Implementar un proxy/manejador HTTP interno en Plexishow. En lugar de pasarle a `ffmpeg` la URL directa del manifiesto remoto del proveedor, Plexishow descargará el manifiesto en memoria, parseará el XML y **eliminará o reescribirá** la etiqueta `suggestedPresentationDelay` poniéndola a `PT0S` (0 segundos) o eliminándola por completo.
+  * **El resultado**: Plexishow le pasará a `ffmpeg` la URL local de este manifiesto "limpio". Al no tener el retraso sugerido, `ffmpeg` descargará inmediatamente el segmento más nuevo del directo real en el estadio, reduciendo la latencia de emisión a prácticamente **0 segundos** de lag de origen en el reproductor del usuario.
+
 ---
 
 ## 🛠️ Explored & Fully Implemented Features
