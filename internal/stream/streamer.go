@@ -311,8 +311,8 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		placeholderLen := len(m.placeholderBytes)
 
 		// Calculate exact real-time chunk size for 100ms sleep interval
-		// (duration of placeholder is 14 seconds)
-		realTimeRate := placeholderLen / 14
+		// (duration of placeholder is 30 seconds)
+		realTimeRate := placeholderLen / 30
 		chunkSize := realTimeRate / 10
 		if chunkSize < 1024 {
 			chunkSize = 1024
@@ -354,7 +354,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			placeholderOffset += activeChunkSize
 			if placeholderOffset >= placeholderLen {
-				placeholderOffset = 0 // Loop placeholder video
+				// If we reached the end of the 30-second placeholder video and still no live stream data,
+				// it means sintonization has failed or the process died. Disconnect the client to release resources.
+				fmt.Printf("[stream] loading failed after 30s for %s, disconnecting client\n", ch.Name)
+				return
 			}
 
 			time.Sleep(100 * time.Millisecond)
