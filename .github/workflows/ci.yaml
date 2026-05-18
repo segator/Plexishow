@@ -46,15 +46,14 @@ jobs:
       - name: Test
         run: mage test
 
-      - name: Build Docker image (PR verification)
-        if: github.event_name != 'push'
+      - name: Build Docker image
         run: mage docker:build
         env:
           VERSION: dev
 
-      - name: Build and publish multi-arch Docker image
+      - name: Push multi-arch Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: mage docker:build-push
+        run: mage docker:push
         env:
           VERSION: dev
 
@@ -80,7 +79,8 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and publish multi-arch Docker image
+      - name: Build and push multi-arch Docker image
         run: |
           MINOR="${GITHUB_REF_NAME%.*}"
-          VERSION="${MINOR}" mage docker:build-push
+          VERSION="${MINOR}" mage docker:build
+          VERSION="${MINOR}" mage docker:push

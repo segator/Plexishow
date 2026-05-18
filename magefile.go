@@ -127,10 +127,10 @@ func (Docker) Publish(ctx context.Context) error {
 	return sh.RunV("docker", "push", tag)
 }
 
-// BuildPush builds and pushes a multi-arch Docker image directly (depends on bin:build).
-func (Docker) BuildPush(ctx context.Context) error {
-	mg.Deps(Bin{}.Build)
-	fmt.Println("Building and pushing multi-arch Docker image...")
+// Push builds and pushes a multi-arch Docker image directly.
+// Relies on buildkit cache from a prior docker:build for speed.
+func (Docker) Push(ctx context.Context) error {
+	fmt.Println("Pushing multi-arch Docker image...")
 	platforms := os.Getenv("PLATFORMS")
 	if platforms == "" {
 		platforms = "linux/amd64,linux/arm64"
