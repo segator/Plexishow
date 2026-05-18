@@ -124,14 +124,7 @@ func (Docker) Build(ctx context.Context) error {
 func (Docker) Publish(ctx context.Context) error {
 	fmt.Println("Publishing Docker image...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
-	latest := fmt.Sprintf("%s:latest", imageName)
-	if err := sh.RunV("docker", "tag", tag, latest); err != nil {
-		return err
-	}
-	if err := sh.RunV("docker", "push", tag); err != nil {
-		return err
-	}
-	return sh.RunV("docker", "push", latest)
+	return sh.RunV("docker", "push", tag)
 }
 
 // Release runs GoReleaser (local, needs git tags)
