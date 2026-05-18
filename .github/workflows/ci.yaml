@@ -84,4 +84,3 @@ jobs:
           MINOR="${GITHUB_REF_NAME%.*}"
           VERSION="${MINOR}" mage docker:build
           VERSION="${MINOR}" mage docker:publish
-          VERSION="${MINOR}" mage docker:tag-latest

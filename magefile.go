@@ -127,17 +127,6 @@ func (Docker) Publish(ctx context.Context) error {
 	return sh.RunV("docker", "push", tag)
 }
 
-// TagLatest tags the current version as latest and pushes it.
-func (Docker) TagLatest(ctx context.Context) error {
-	fmt.Println("Tagging and pushing latest...")
-	tag := fmt.Sprintf("%s:%s", imageName, version)
-	latest := fmt.Sprintf("%s:latest", imageName)
-	if err := sh.RunV("docker", "tag", tag, latest); err != nil {
-		return err
-	}
-	return sh.RunV("docker", "push", latest)
-}
-
 // Release runs GoReleaser (local, needs git tags)
 func Release() error {
 	mg.Deps(Vet)
