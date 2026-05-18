@@ -49,6 +49,13 @@ This document acts as a persistent repository backlog of ideas, feature proposal
   * When a Plex client pauses, keep the upstream HTTP connection and `ffmpeg` transcoding process alive in the background (writing to the circular buffer).
   * If Plex resumes, serve the stream from the cached buffer. If Plex experiences network congestion, the server acts as an elastic buffer, padding or throttling the output dynamically without severing the TCP pipe.
 
+### 7. ⏳ Instant Channel Loading Video Placeholder
+* **Goal**: Provide instantaneous player response, reducing the subjective "Tune Time" (channel zapping wait) to **0 seconds**.
+* **Concept**:
+  * When a Plex client connects, Plexishow immediately begins serving a pre-rendered loop placeholder video (e.g. showing a loading animation or "Cargando canal...") that is already cached in RAM in MPEG-TS format.
+  * Meanwhile, Plexishow launches the real `ffmpeg` IPTV connection, parses the DASH playlist, decrypts CENC keys, and initializes transcoding.
+  * Once the first live audio/video packet is successfully read from `ffmpeg`, the streaming session dynamically hot-swaps the packet output from the placeholder video to the live stream. This makes the player open the video instantly without stalling for 5-10 seconds.
+
 ---
 
 ## 🛠️ Explored & Fully Implemented Features

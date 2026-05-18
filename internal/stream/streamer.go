@@ -370,6 +370,7 @@ func (m *Manager) Shutdown() {
 func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 	var args []string
 
+	// -y: Automatically overwrite output files without prompting (critical for non-interactive execution)
 	args = append(args, "-y")
 
 	// VAAPI requires -vaapi_device to be defined BEFORE -i (global option)
@@ -381,11 +382,12 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 		args = append(args, "-vaapi_device", device)
 	}
 
+	// -cenc_decryption_key: The 128-bit hex key to decrypt AES-CTR Common Encryption (CENC) streams
 	if ch.Key != "" {
 		args = append(args, "-cenc_decryption_key", ch.Key)
 	}
 
-	// ffmpeg has a dedicated -user_agent flag; everything else goes via -headers
+	// -user_agent: Custom HTTP User-Agent header expected by the IPTV CDN/origin server
 	if ua, ok := ch.Headers["User-Agent"]; ok {
 		args = append(args, "-user_agent", ua)
 	}
@@ -399,6 +401,7 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 		fmt.Fprintf(&hdr, "%s: %s\r\n", k, v)
 	}
 	if hdr.Len() > 0 {
+		// -headers: Dynamic custom HTTP headers (such as Authorization/X-TCDN-token and Referer)
 		args = append(args, "-headers", hdr.String())
 	}
 
@@ -411,30 +414,42 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 	if analyzeduration == "" {
 		analyzeduration = "1000000"
 	}
+	// -probesize: Size in bytes of input to analyze for stream information. A lower size speeds up startup
 	args = append(args, "-probesize", probesize)
+	// -analyzeduration: Duration in microseconds to analyze for stream information. A lower duration speeds up startup
 	args = append(args, "-analyzeduration", analyzeduration)
-	args = append(args, "-fflags", "+igndts+genpts")
+	// -fpsprobesize 0: Do not read extra packets to estimate frame rate of secondary tracks, stopping DASH startup delays
+	args = append(args, "-fpsprobesize", "0")
+	// -fflags +igndts+genpts+nobuffer: +igndts ignores invalid DTS timestamps; +genpts generates missing PTS; +nobuffer disables internal demuxer buffering for minimal latency
+	args = append(args, "-fflags", "+igndts+genpts+nobuffer")
 
 	if cfg.Reconnect {
+		// -reconnect 1: Retry HTTP connections automatically on transient network drops
 		args = append(args, "-reconnect", "1")
 	}
 	if cfg.ReconnectStreamed {
+		// -reconnect_streamed 1: Force reconnection support even for streamed HTTP payloads (like DASH chunks)
 		args = append(args, "-reconnect_streamed", "1")
 	}
 	if cfg.ReconnectDelayMax > 0 {
+		// -reconnect_delay_max: Maximum backoff delay in seconds between connection retries
 		args = append(args, "-reconnect_delay_max", strconv.Itoa(cfg.ReconnectDelayMax))
 	}
 	if cfg.RWTimeout != "" {
+		// -rw_timeout: Read/Write network operation timeout in microseconds to fail fast and trigger reconnects
 		args = append(args, "-rw_timeout", cfg.RWTimeout)
 	}
 
+	// -i: The input stream URL (e.g., DASH .mpd or HLS .m3u8)
 	args = append(args, "-i", ch.URL)
+	// -map 0:v:0 -map 0:a:0: Selects only the first video track and the first audio track to skip secondary tracks
 	args = append(args, "-map", "0:v:0", "-map", "0:a:0")
 
 	if cfg.Transcode {
 		// Video Transcoding
 		switch cfg.HWAccel {
 		case "nvenc":
+			// GPU Transcoding with NVIDIA NVENC (-c:v h264_nvenc)
 			args = append(args, "-c:v", "h264_nvenc")
 			if cfg.Preset != "" {
 				args = append(args, "-preset", cfg.Preset)
@@ -446,8 +461,11 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 			} else {
 				args = append(args, "-cq", "18")
 			}
+			// -delay 0: Force zero-latency encoding mode in the NVENC hardware chip (no frame lookahead delay).
+			// This option is exclusive to NVENC and guarantees instantaneous frame delivery without buffering.
+			args = append(args, "-delay", "0")
 		case "vaapi":
-			// For VAAPI H.264, upload input frames to VAAPI surfaces on GPU
+			// GPU Transcoding with Intel/AMD VAAPI H.264, upload input frames to VAAPI surfaces on GPU
 			args = append(args, "-vf", "format=nv12,hwupload")
 			args = append(args, "-c:v", "h264_vaapi")
 			if cfg.CRF > 0 {
@@ -456,6 +474,7 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 				args = append(args, "-qp", "18")
 			}
 		case "qsv":
+			// GPU Transcoding with Intel QSV H.264
 			args = append(args, "-c:v", "h264_qsv")
 			if cfg.Preset != "" {
 				args = append(args, "-preset", cfg.Preset)
@@ -466,6 +485,7 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 				args = append(args, "-global_quality", "18")
 			}
 		default: // CPU encoding using libx264
+			// CPU Transcoding with standard x264 (-c:v libx264)
 			args = append(args, "-c:v", "libx264")
 			preset := cfg.Preset
 			if preset == "" {
@@ -477,10 +497,16 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 				crf = 18
 			}
 			args = append(args, "-crf", strconv.Itoa(crf))
+			// -tune zerolatency: Disables B-frames and lookahead to achieve sub-frame encoding delay on CPU
+			args = append(args, "-tune", "zerolatency")
 		}
 
 		// Audio Transcoding
-		args = append(args, "-c:a", "aac")
+		audioCodec := cfg.AudioCodec
+		if audioCodec == "" {
+			audioCodec = "aac"
+		}
+		args = append(args, "-c:a", audioCodec)
 		audioBitrate := cfg.AudioBitrate
 		if audioBitrate == "" {
 			audioBitrate = "192k"
@@ -488,12 +514,15 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 		args = append(args, "-b:a", audioBitrate)
 		args = append(args, "-af", "aresample=async=1")
 	} else {
-		// Direct stream copy
+		// Direct Stream Copy (No transcoding): extremely low CPU load, copy raw streams as is
 		args = append(args, "-c:v", "copy", "-c:a", "copy")
 	}
 
+	// -avoid_negative_ts make_zero: Shift all timestamps so they start at zero to prevent client player desync
 	args = append(args, "-avoid_negative_ts", "make_zero")
+	// -max_muxing_queue_size 9999: Expand the muxing queue limit to prevent packet drop errors during startup spikes
 	args = append(args, "-max_muxing_queue_size", "9999")
+	// -f mpegts -: Output in MPEG Transport Stream (MPEG-TS) format piped directly to standard output (stdout)
 	args = append(args, "-f", "mpegts", "-")
 	return args
 }

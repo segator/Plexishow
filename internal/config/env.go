@@ -69,6 +69,9 @@ func applyEnv(cfg *Config) {
 			cfg.FFmpeg.CRF = n
 		}
 	}
+	if v := os.Getenv(envPrefix + "FFMPEG_AUDIO_CODEC"); v != "" {
+		cfg.FFmpeg.AudioCodec = v
+	}
 	if v := os.Getenv(envPrefix + "FFMPEG_AUDIO_BITRATE"); v != "" {
 		cfg.FFmpeg.AudioBitrate = v
 	}

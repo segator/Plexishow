@@ -55,6 +55,7 @@ func main() {
 	ffmpegHWAccel := flag.String("ffmpeg-hwaccel", "", "FFmpeg hardware acceleration: nvenc, vaapi, qsv")
 	ffmpegPreset := flag.String("ffmpeg-preset", "", "FFmpeg encoder preset")
 	ffmpegCRF := flag.Int("ffmpeg-crf", 0, "FFmpeg CRF / quality parameter")
+	ffmpegAudioCodec := flag.String("ffmpeg-audio-codec", "", "FFmpeg audio encoder: aac, libfdk_aac, etc.")
 	ffmpegAudioBitrate := flag.String("ffmpeg-audio-bitrate", "", "FFmpeg audio bitrate")
 	ffmpegVAAPIDevice := flag.String("ffmpeg-vaapi-device", "", "FFmpeg VAAPI device path")
 	ffmpegReconnect := flag.Bool("ffmpeg-reconnect", true, "Enable FFmpeg automatic reconnect on HTTP failures")
@@ -111,6 +112,9 @@ func main() {
 	}
 	if *ffmpegCRF > 0 {
 		flags["ffmpeg_crf"] = strconv.Itoa(*ffmpegCRF)
+	}
+	if *ffmpegAudioCodec != "" {
+		flags["ffmpeg_audio_codec"] = *ffmpegAudioCodec
 	}
 	if *ffmpegAudioBitrate != "" {
 		flags["ffmpeg_audio_bitrate"] = *ffmpegAudioBitrate

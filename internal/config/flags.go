@@ -69,6 +69,9 @@ func applyFlags(cfg *Config, flags map[string]string) {
 			cfg.FFmpeg.CRF = n
 		}
 	}
+	if v, ok := flags["ffmpeg_audio_codec"]; ok {
+		cfg.FFmpeg.AudioCodec = v
+	}
 	if v, ok := flags["ffmpeg_audio_bitrate"]; ok {
 		cfg.FFmpeg.AudioBitrate = v
 	}

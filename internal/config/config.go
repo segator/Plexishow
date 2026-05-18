@@ -30,6 +30,7 @@ type FFmpegConfig struct {
 	HWAccel           string `yaml:"hwaccel"`
 	Preset            string `yaml:"preset"`
 	CRF               int    `yaml:"crf"`
+	AudioCodec        string `yaml:"audio_codec"`
 	AudioBitrate      string `yaml:"audio_bitrate"`
 	VAAPIDevice       string `yaml:"vaapi_device"`
 	Reconnect         bool   `yaml:"reconnect"`
@@ -72,10 +73,11 @@ func applyDefaults(cfg *Config) {
 	cfg.RefreshInterval = 5 * time.Minute
 	cfg.FFmpegPath = "ffmpeg"
 	cfg.LogsDir = "/tmp/plexishow-logs"
-	cfg.FFmpeg.Probesize = "1500000"
-	cfg.FFmpeg.Analyzeduration = "1000000"
+	cfg.FFmpeg.Probesize = "500000"
+	cfg.FFmpeg.Analyzeduration = "500000"
 	cfg.FFmpeg.Preset = "veryfast"
 	cfg.FFmpeg.CRF = 18
+	cfg.FFmpeg.AudioCodec = "aac"
 	cfg.FFmpeg.AudioBitrate = "192k"
 	cfg.FFmpeg.VAAPIDevice = "/dev/dri/renderD128"
 	cfg.FFmpeg.Reconnect = true
