@@ -203,12 +203,16 @@ mage run -- -m3u-url "https://example.com/playlist.m3u"
 
 The Docker image is published to `ghcr.io/segator/plexishow`.
 
+To run the stable release:
 ```bash
 docker run -d --name plexishow \
   -p 8080:8080 \
   -e PLEXISHOW_M3U_URL="https://example.com/playlist.m3u" \
-  ghcr.io/segator/plexishow:latest
+  ghcr.io/segator/plexishow:1.0.0
 ```
+
+> [!NOTE]
+> To test the absolute latest development build from the `main` branch, you can pull and run `ghcr.io/segator/plexishow:dev` instead.
 
 ### Docker Compose
 
@@ -218,7 +222,7 @@ Create a `docker-compose.yml`:
 version: '3.8'
 services:
   plexishow:
-    image: ghcr.io/segator/plexishow:latest
+    image: ghcr.io/segator/plexishow:1.0.0 # Use :dev for the latest main branch build
     container_name: plexishow
     ports:
       - "8080:8080"
@@ -247,7 +251,7 @@ Plexishow is packaged and published as an **OCI Helm Chart** in the GitHub Conta
 helm registry login ghcr.io -u <your-username>
 
 # Install the official release from GHCR
-helm install plexishow oci://ghcr.io/segator/plexishow \
+helm install plexishow oci://ghcr.io/segator/plexishow/charts/plexishow \
   --version 1.0.0 \
   --set config.m3u_url="https://example.com/playlist.m3u" \
   --set config.epg_url="https://example.com/epg.xml"
@@ -256,7 +260,7 @@ helm install plexishow oci://ghcr.io/segator/plexishow \
 To install the latest development version built from the `main` branch:
 
 ```bash
-helm install plexishow oci://ghcr.io/segator/plexishow \
+helm install plexishow oci://ghcr.io/segator/plexishow/charts/plexishow \
   --version 0.0.0-dev \
   --set config.m3u_url="https://example.com/playlist.m3u" \
   --set config.epg_url="https://example.com/epg.xml"
