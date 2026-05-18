@@ -111,10 +111,10 @@ func (s *session) broadcast(stderr io.ReadCloser, name string, logDir string) {
 			color := channelColor(name)
 			var logFile *os.File
 			if logDir != "" {
-				if err := os.MkdirAll(logDir, 0o755); err == nil {
+				if err := os.MkdirAll(logDir, 0o700); err == nil {
 					path := filepath.Join(logDir, sanitizeName(name)+".log")
-					//#nosec G304
-					f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+					//#nosec G304 G703 -- name is sanitized
+					f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 					if err == nil {
 						logFile = f
 						fmt.Printf("[stream] ffmpeg log for %s → %s\n", name, path)
@@ -200,7 +200,7 @@ func (m *Manager) statsLogger() {
 	for range ticker.C {
 		m.mu.Lock()
 		if len(m.sessions) > 0 {
-			var stats []string
+			stats := make([]string, 0, len(m.sessions))
 			for id, sess := range m.sessions {
 				ch, ok := m.store.Get(id)
 				name := id
@@ -248,9 +248,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mu.Unlock()
 
 	if !exists || !sess.addSub(chData) {
-		if exists {
-			// session died between the unlock and addSub
-		}
+		// Session died between the unlock and addSub (or didn't exist)
 		select {
 		case m.sem <- struct{}{}:
 		default:

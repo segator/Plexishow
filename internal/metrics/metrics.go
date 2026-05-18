@@ -59,8 +59,12 @@ func (r *Registry) RemoveViewer(channel string) {
 }
 
 func (r *Registry) AddBytesSent(channel string, bytes int) {
+	if bytes <= 0 {
+		return
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	//#nosec G115 -- safe conversion after bounds check
 	r.bytesSent[channel] += uint64(bytes)
 }
 
