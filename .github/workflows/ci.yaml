@@ -50,8 +50,6 @@ jobs:
         run: mage docker:build
         env:
           VERSION: dev
-          BUILDX_CACHE_FROM: type=gha
-          BUILDX_CACHE_TO: type=gha,mode=max
 
       - name: Publish Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

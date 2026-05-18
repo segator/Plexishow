@@ -112,22 +112,12 @@ func Build(ctx context.Context) {
 // Docker groups Docker image targets.
 type Docker mg.Namespace
 
-// Build builds the Docker image (depends on bin:build) with buildx caching.
+// Build builds the Docker image (depends on bin:build).
 func (Docker) Build(ctx context.Context) error {
 	mg.Deps(Bin{}.Build)
 	fmt.Println("Building Docker image...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
-	cacheFrom := os.Getenv("BUILDX_CACHE_FROM")
-	cacheTo := os.Getenv("BUILDX_CACHE_TO")
-	args := []string{"buildx", "build", "--load"}
-	if cacheFrom != "" {
-		args = append(args, "--cache-from="+cacheFrom)
-	}
-	if cacheTo != "" {
-		args = append(args, "--cache-to="+cacheTo)
-	}
-	args = append(args, "-t", tag, "-f", "Dockerfile", ".")
-	return sh.RunV("docker", args...)
+	return sh.RunV("docker", "buildx", "build", "--load", "-t", tag, "-f", "Dockerfile", ".")
 }
 
 // Publish pushes the Docker image to the registry (image must already exist locally).
