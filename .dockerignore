@@ -4,6 +4,7 @@
 # Only include what's needed for the Docker image
 !bin/plexishow
 !config.example.yaml
+!assets/
 
 # Allow Dockerfiles
 !Dockerfile

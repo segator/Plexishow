@@ -86,53 +86,76 @@ ffmpeg:
 
 ### Environment Variables
 
+#### Server
+
 | Variable | Requirement | Description |
 |----------|-------------|-------------|
 | `PLEXISHOW_M3U_URL` | **Mandatory** | M3U playlist URL |
 | `PLEXISHOW_EPG_URL` | Optional | EPG XMLTV URL |
+| `PLEXISHOW_BASE_URL` | Optional | Base URL advertised to clients |
 | `PLEXISHOW_LISTEN_ADDR` | Optional | HTTP listen address (default `:8080`) |
 | `PLEXISHOW_MAX_STREAMS` | Optional | Max concurrent streams (default `4`) |
 | `PLEXISHOW_STREAM_TIMEOUT` | Optional | Per-stream idle timeout (default `30s`) |
-| `PLEXISHOW_REFRESH_INTERVAL`| Optional | M3U refresh interval (default `1h`) |
+| `PLEXISHOW_REFRESH_INTERVAL` | Optional | M3U refresh interval (default `5m`) |
 | `PLEXISHOW_FFMPEG_PATH` | Optional | Path to ffmpeg binary (default `ffmpeg`) |
-| `PLEXISHOW_BASE_URL` | Optional | Base URL advertised to clients |
-| `PLEXISHOW_TOKEN` | Optional | X-TCDN-token for all channels |
-| `PLEXISHOW_FFMPEG_TRANSCODE` | Optional | Enable full real-time transcoding (default `false`) |
-| `PLEXISHOW_FFMPEG_HWACCEL` | Optional | GPU hardware accelerator (`nvenc`, `vaapi`, `qsv`, default `""`) |
-| `PLEXISHOW_FFMPEG_PRESET` | Optional | Codifier preset (default `"veryfast"`) |
+| `PLEXISHOW_LOGS_DIR` | Optional | Per-channel ffmpeg log directory (default `/tmp/plexishow-logs`) |
+| `PLEXISHOW_TRANSCODE` | Optional | Enable full CPU transcoding (default `false`) |
+
+#### FFmpeg
+
+| Variable | Requirement | Description |
+|----------|-------------|-------------|
+| `PLEXISHOW_FFMPEG_PROBESIZE` | Optional | Probe buffer size in bytes (default `"500000"`) |
+| `PLEXISHOW_FFMPEG_ANALYZEDURATION` | Optional | Maximum analysis duration in µs (default `"500000"`) |
+| `PLEXISHOW_FFMPEG_TRANSCODE` | Optional | Enable real-time transcoding (default `false`) |
+| `PLEXISHOW_FFMPEG_HWACCEL` | Optional | GPU hardware accelerator (`nvenc`, `vaapi`, `qsv`) |
+| `PLEXISHOW_FFMPEG_PRESET` | Optional | Encoder preset (default `"veryfast"`) |
 | `PLEXISHOW_FFMPEG_CRF` | Optional | CRF quality parameter (default `18`) |
-| `PLEXISHOW_FFMPEG_AUDIO_BITRATE`| Optional| Transcoded audio stream bitrate (default `"192k"`) |
-| `PLEXISHOW_FFMPEG_VAAPI_DEVICE` | Optional | AMD/Intel VAAPI graphics device path (default `"/dev/dri/renderD128"`) |
-| `PLEXISHOW_FFMPEG_RECONNECT` | Optional | Automatically reconnect HTTP socket on network failures (default `true`) |
+| `PLEXISHOW_FFMPEG_AUDIO_CODEC` | Optional | Audio encoder codec (default `"aac"`) |
+| `PLEXISHOW_FFMPEG_AUDIO_BITRATE` | Optional | Transcoded audio stream bitrate (default `"192k"`) |
+| `PLEXISHOW_FFMPEG_VAAPI_DEVICE` | Optional | VAAPI graphics device path (default `"/dev/dri/renderD128"`) |
+| `PLEXISHOW_FFMPEG_RECONNECT` | Optional | Auto-reconnect HTTP socket on network failures (default `true`) |
 | `PLEXISHOW_FFMPEG_RECONNECT_STREAMED` | Optional | Auto-reconnect live streamed HTTP payloads (default `true`) |
-| `PLEXISHOW_FFMPEG_RECONNECT_DELAY_MAX` | Optional | Maximum delay in seconds between reconnect tries (default `5`) |
-| `PLEXISHOW_FFMPEG_RW_TIMEOUT` | Optional | Read-write timeout threshold in microseconds (default `"10000000"`) |
-| `PLEXISHOW_FFMPEG_PROBESIZE` | Optional | Analysis buffer probing size in bytes (default `"1500000"`) |
-| `PLEXISHOW_FFMPEG_ANALYZE_DURATION` | Optional | Maximum analysis duration in microseconds (default `"1000000"`) |
+| `PLEXISHOW_FFMPEG_RECONNECT_DELAY_MAX` | Optional | Max delay in seconds between reconnect tries (default `5`) |
+| `PLEXISHOW_FFMPEG_RW_TIMEOUT` | Optional | Read-write timeout in microseconds (default `"10000000"`) |
+
+#### Default Headers
+
+| Variable | Requirement | Description |
+|----------|-------------|-------------|
+| `PLEXISHOW_DEFAULT_HEADERS_TOKEN` | Optional | X-TCDN-token for all channels |
 
 ### CLI Flags
 
-- **`-m3u-url`** *(Mandatory)*: M3U playlist URL (overrides config/env). This is the only required parameter.
-- **`-config`** *(Optional)*: Path to config file (default "config.yaml").
-- **`-epg-url`** *(Optional)*: EPG XMLTV URL (overrides config/env).
-- **`-base-url`** *(Optional)*: Base URL advertised to clients (overrides config/env).
-- **`-listen-addr`** *(Optional)*: HTTP listen address (default ":8080", overrides config/env).
-- **`-max-streams`** *(Optional)*: Max concurrent streams (overrides config/env).
-- **`-stream-timeout`** *(Optional)*: Per-stream idle timeout (overrides config/env).
-- **`-refresh-interval`** *(Optional)*: M3U refresh interval (overrides config/env).
-- **`-token`** *(Optional)*: X-TCDN-token for all channels (overrides M3U stream_headers).
-- **`-ffmpeg-transcode`** *(Optional)*: Enable transcoding (overrides config/env, default `false`).
-- **`-ffmpeg-hwaccel`** *(Optional)*: Set GPU acceleration: `nvenc`, `vaapi`, `qsv` (overrides config/env).
-- **`-ffmpeg-preset`** *(Optional)*: Codec speed preset (overrides config/env).
-- **`-ffmpeg-crf`** *(Optional)*: Quality/CRF level (overrides config/env).
-- **`-ffmpeg-audio-bitrate`** *(Optional)*: Trascoded audio bit rate (overrides config/env).
-- **`-ffmpeg-vaapi-device`** *(Optional)*: VAAPI hardware driver device (overrides config/env).
-- **`-ffmpeg-reconnect`** *(Optional)*: Toggle HTTP autoconnect (default `true`, overrides config/env).
-- **`-ffmpeg-reconnect-streamed`** *(Optional)*: Toggle live HTTP stream autoconnect (default `true`, overrides config/env).
-- **`-ffmpeg-reconnect-delay-max`** *(Optional)*: Max delay in seconds for reconnection (overrides config/env).
-- **`-ffmpeg-rw-timeout`** *(Optional)*: R/W timeout in microseconds (overrides config/env).
-- **`-ffmpeg-probesize`** *(Optional)*: Probesize in bytes (overrides config/env).
-- **`-ffmpeg-analyzeduration`** *(Optional)*: Analyzeduration in microseconds (overrides config/env).
+#### Server
+
+- **`-config`** *(Optional)*: Path to config file (default `"config.yaml"`).
+- **`-m3u-url`** *(Mandatory)*: M3U playlist URL.
+- **`-epg-url`** *(Optional)*: EPG XMLTV URL.
+- **`-base-url`** *(Optional)*: Base URL advertised to clients.
+- **`-listen-addr`** *(Optional)*: HTTP listen address (default `:8080`).
+- **`-max-streams`** *(Optional)*: Max concurrent streams (default `4`).
+- **`-stream-timeout`** *(Optional)*: Per-stream idle timeout (default `30s`).
+- **`-refresh-interval`** *(Optional)*: M3U refresh interval (default `5m`).
+- **`-token`** *(Optional)*: X-TCDN-token for all channels.
+- **`-logs-dir`** *(Optional)*: Per-channel ffmpeg log directory.
+- **`-transcode`** *(Optional)*: Enable full CPU transcoding (default `false`).
+
+#### FFmpeg
+
+- **`-ffmpeg-probesize`** *(Optional)*: Probe buffer size in bytes.
+- **`-ffmpeg-analyzeduration`** *(Optional)*: Maximum analysis duration in µs.
+- **`-ffmpeg-transcode`** *(Optional)*: Enable real-time transcoding (default `false`).
+- **`-ffmpeg-hwaccel`** *(Optional)*: GPU acceleration engine (`nvenc`, `vaapi`, `qsv`).
+- **`-ffmpeg-preset`** *(Optional)*: Encoder preset (default `"veryfast"`).
+- **`-ffmpeg-crf`** *(Optional)*: CRF quality parameter (default `18`).
+- **`-ffmpeg-audio-codec`** *(Optional)*: Audio encoder codec (default `"aac"`).
+- **`-ffmpeg-audio-bitrate`** *(Optional)*: Transcoded audio bitrate (default `"192k"`).
+- **`-ffmpeg-vaapi-device`** *(Optional)*: VAAPI device path (default `"/dev/dri/renderD128"`).
+- **`-ffmpeg-reconnect`** *(Optional)*: Auto-reconnect on HTTP failures (default `true`).
+- **`-ffmpeg-reconnect-streamed`** *(Optional)*: Auto-reconnect live HTTP streams (default `true`).
+- **`-ffmpeg-reconnect-delay-max`** *(Optional)*: Max reconnect delay in seconds (default `5`).
+- **`-ffmpeg-rw-timeout`** *(Optional)*: Read/write timeout in microseconds (default `"10000000"`).
 
 ---
 
