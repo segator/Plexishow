@@ -81,6 +81,8 @@ func TestBuildArgsNoKey(t *testing.T) {
 		"-avoid_negative_ts", "make_zero",
 		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
+		"-mpegts_pmt_start_pid", "4096",
+		"-mpegts_start_pid", "256",
 		"-",
 	}
 	if len(args) != len(want) {
@@ -115,6 +117,8 @@ func TestBuildArgsTranscode(t *testing.T) {
 		"-avoid_negative_ts", "make_zero",
 		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
+		"-mpegts_pmt_start_pid", "4096",
+		"-mpegts_start_pid", "256",
 		"-",
 	}
 	if len(args) != len(want) {
@@ -151,6 +155,8 @@ func TestBuildArgsNVENC(t *testing.T) {
 		"-avoid_negative_ts", "make_zero",
 		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
+		"-mpegts_pmt_start_pid", "4096",
+		"-mpegts_start_pid", "256",
 		"-",
 	}
 	if len(args) != len(want) {
@@ -189,6 +195,8 @@ func TestBuildArgsVAAPI(t *testing.T) {
 		"-avoid_negative_ts", "make_zero",
 		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
+		"-mpegts_pmt_start_pid", "4096",
+		"-mpegts_start_pid", "256",
 		"-",
 	}
 	if len(args) != len(want) {
@@ -225,6 +233,8 @@ func TestBuildArgsQSV(t *testing.T) {
 		"-avoid_negative_ts", "make_zero",
 		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
+		"-mpegts_pmt_start_pid", "4096",
+		"-mpegts_start_pid", "256",
 		"-",
 	}
 	if len(args) != len(want) {

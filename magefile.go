@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -94,7 +95,7 @@ type Bin mg.Namespace
 
 // Build compiles the binary into bin/plexishow.
 func (Bin) Build(ctx context.Context) error {
-	mg.Deps(Vet)
+	mg.Deps(Vet, Generate{}.Placeholder)
 	fmt.Println("Building binary...")
 	if err := os.MkdirAll("bin", 0755); err != nil {
 		return err
@@ -222,4 +223,23 @@ func All(ctx context.Context) {
 	mg.Deps(Fmt, Vet)
 	mg.Deps(Test)
 	mg.Deps(Bin.Build)
+}
+
+// Generate groups asset generation targets.
+type Generate mg.Namespace
+
+// Placeholder generates the Full HD Stereo countdown video in assets/placeholder.ts.
+// Fails gracefully if ffmpeg is not installed.
+func (Generate) Placeholder(ctx context.Context) error {
+	fmt.Println("Checking for ffmpeg to generate assets...")
+	_, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		fmt.Println("WARNING: ffmpeg not found in PATH. Skipping placeholder video generation. The application will run without the loading placeholder feature.")
+		return nil
+	}
+	fmt.Println("Generating placeholder video...")
+	if err := os.MkdirAll("assets", 0755); err != nil {
+		return err
+	}
+	return sh.RunV("./scripts/generate_placeholder.sh")
 }

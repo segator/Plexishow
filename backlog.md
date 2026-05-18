@@ -49,13 +49,6 @@ This document acts as a persistent repository backlog of ideas, feature proposal
   * When a Plex client pauses, keep the upstream HTTP connection and `ffmpeg` transcoding process alive in the background (writing to the circular buffer).
   * If Plex resumes, serve the stream from the cached buffer. If Plex experiences network congestion, the server acts as an elastic buffer, padding or throttling the output dynamically without severing the TCP pipe.
 
-### 7. ⏳ Instant Channel Loading Video Placeholder
-* **Goal**: Provide instantaneous player response, reducing the subjective "Tune Time" (channel zapping wait) to **0 seconds**.
-* **Concept**:
-  * When a Plex client connects, Plexishow immediately begins serving a pre-rendered loop placeholder video (e.g. showing a loading animation or "Cargando canal...") that is already cached in RAM in MPEG-TS format.
-  * Meanwhile, Plexishow launches the real `ffmpeg` IPTV connection, parses the DASH playlist, decrypts CENC keys, and initializes transcoding.
-  * Once the first live audio/video packet is successfully read from `ffmpeg`, the streaming session dynamically hot-swaps the packet output from the placeholder video to the live stream. This makes the player open the video instantly without stalling for 5-10 seconds.
-
 ### 8. ⚡ Interceptor & Stripper de Manifiesto XML DASH (`suggestedPresentationDelay`)
 * **Goal**: Forzar a `ffmpeg` a sintonizar en el borde absoluto del directo, eliminando los 20 segundos de retraso por defecto (esencial para fútbol y deportes en vivo).
 * **Concept**:
@@ -67,6 +60,7 @@ This document acts as a persistent repository backlog of ideas, feature proposal
 
 ## 🛠️ Explored & Fully Implemented Features
 
+* [x] **Instant Channel Loading Video Placeholder**: High-end zapping experience offering a **0-second subjective tune time**. Serves a beautifully pre-rendered 10-second Full HD (1080p) Stereo 48kHz retro film countdown loop in RAM instantly on client connection. Handled in Go via thread-safe hot-swapping, custom discontinuity indicator packets (PID 0x0100 for H.264, PID 0x0101 for AAC), and automatic channel draining to prevent network stuttering.
 * [x] **Stream Multiplexing (Fan-Out / Sharing)**: The streaming core is 100% shared! Tuning 2 clients to the same channel does **not** launch two `ffmpeg` transcode processes; the underlying thread-safe subscriber architecture redirects the decrypted stdout packet buffer to all active clients seamlessly.
 * [x] **Dynamic GPU Acceleration**: Fully configurable support for NVENC, VAAPI, and QSV hardware pipelines.
 * [x] **Network Recovery (HTTP Reconnects)**: Micro-second network drop safety via custom configurable `-reconnect 1 -rw_timeout` parameters.

@@ -8,6 +8,7 @@ RUN apk add --no-cache \
     mesa-va-gallium \
     libdrm
 COPY bin/plexishow /usr/local/bin/plexishow
+COPY assets/ /assets/
 EXPOSE 8080
 ENTRYPOINT ["plexishow"]
 CMD ["-config", "/etc/plexishow/config.yaml"]

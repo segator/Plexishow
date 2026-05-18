@@ -55,6 +55,13 @@ type session struct {
 	done        chan struct{}
 	idleTimer   *time.Timer
 	idleTimeout time.Duration
+	hasData     bool
+}
+
+func (s *session) getHasData() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.hasData
 }
 
 func (s *session) addSub(ch chan []byte, ip string) bool {
@@ -146,6 +153,9 @@ func (s *session) broadcast(stderr io.ReadCloser, name string, logDir string) {
 		if n > 0 {
 			data := append([]byte(nil), buf[:n]...)
 			s.mu.Lock()
+			if !s.hasData {
+				s.hasData = true
+			}
 			for ch := range s.subs {
 				select {
 				case ch <- data:
@@ -178,12 +188,13 @@ func (s *session) broadcast(stderr io.ReadCloser, name string, logDir string) {
 }
 
 type Manager struct {
-	cfg      config.Config
-	store    *store.Store
-	metrics  *metrics.Registry
-	mu       sync.Mutex
-	sessions map[string]*session
-	sem      chan struct{}
+	cfg              config.Config
+	store            *store.Store
+	metrics          *metrics.Registry
+	mu               sync.Mutex
+	sessions         map[string]*session
+	sem              chan struct{}
+	placeholderBytes []byte
 }
 
 func NewManager(cfg config.Config, st *store.Store, metrics *metrics.Registry) *Manager {
@@ -194,6 +205,16 @@ func NewManager(cfg config.Config, st *store.Store, metrics *metrics.Registry) *
 		sessions: make(map[string]*session),
 		sem:      make(chan struct{}, cfg.MaxStreams),
 	}
+
+	// Try to load pre-rendered retro countdown placeholder video
+	placeholderPath := "assets/placeholder.ts"
+	if data, err := os.ReadFile(placeholderPath); err == nil {
+		m.placeholderBytes = data
+		fmt.Printf("[stream] Loaded %d bytes of retro countdown placeholder video from %s\n", len(data), placeholderPath)
+	} else {
+		fmt.Printf("[stream] No placeholder video found at %s (skipping loading placeholder feature): %v\n", placeholderPath, err)
+	}
+
 	go m.statsLogger()
 	return m
 }
@@ -283,6 +304,61 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
+	}	// Play retro countdown loading placeholder if the stream hasn't produced any video frames yet
+	if (sess == nil || !sess.getHasData()) && len(m.placeholderBytes) > 0 {
+		fmt.Printf("[stream] playing placeholder countdown for %s\n", ch.Name)
+		placeholderOffset := 0
+		placeholderLen := len(m.placeholderBytes)
+
+		// Calculate exact real-time chunk size for 100ms sleep interval
+		// (duration of placeholder is 14 seconds)
+		realTimeRate := placeholderLen / 14
+		chunkSize := realTimeRate / 10
+		if chunkSize < 1024 {
+			chunkSize = 1024
+		}
+
+		for {
+			if sess != nil && sess.getHasData() {
+				fmt.Printf("[stream] transitioning to live stream for %s\n", ch.Name)
+
+				// Write discontinuity packets to force VLC/Plex to reset its PTS and continue seamlessly
+				writeDiscontinuityPacket(w, 0x0100) // Video stream PID
+				writeDiscontinuityPacket(w, 0x0101) // Audio stream PID
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				break
+			}
+
+			select {
+			case <-r.Context().Done():
+				return
+			default:
+			}
+
+			// Write a chunk of the placeholder
+			activeChunkSize := chunkSize
+			if placeholderOffset+activeChunkSize > placeholderLen {
+				activeChunkSize = placeholderLen - placeholderOffset
+			}
+
+			n, err := w.Write(m.placeholderBytes[placeholderOffset : placeholderOffset+activeChunkSize])
+			if err != nil {
+				return
+			}
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			m.metrics.AddBytesSent(ch.Name, n)
+
+			placeholderOffset += activeChunkSize
+			if placeholderOffset >= placeholderLen {
+				placeholderOffset = 0 // Loop placeholder video
+			}
+
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 
 	timer := time.NewTimer(m.cfg.StreamTimeout)
@@ -534,6 +610,23 @@ func buildArgs(ch m3u.Channel, cfg config.FFmpegConfig) []string {
 	// -max_muxing_queue_size 9999: Expand the muxing queue limit to prevent packet drop errors during startup spikes
 	args = append(args, "-max_muxing_queue_size", "9999")
 	// -f mpegts -: Output in MPEG Transport Stream (MPEG-TS) format piped directly to standard output (stdout)
-	args = append(args, "-f", "mpegts", "-")
+	args = append(args, "-f", "mpegts")
+	args = append(args, "-mpegts_pmt_start_pid", "4096")
+	args = append(args, "-mpegts_start_pid", "256")
+	args = append(args, "-")
 	return args
+}
+
+func writeDiscontinuityPacket(w io.Writer, pid uint16) {
+	pkt := make([]byte, 188)
+	pkt[0] = 0x47          // Sync byte
+	pkt[1] = byte(pid >> 8) // High bits of PID
+	pkt[2] = byte(pid & 0xFF) // Low bits of PID
+	pkt[3] = 0x20          // Adaptation field only, no payload
+	pkt[4] = 0x01          // Adaptation field length = 1
+	pkt[5] = 0x80          // Discontinuity indicator = 1
+	for i := 6; i < 188; i++ {
+		pkt[i] = 0xFF // Padding
+	}
+	_, _ = w.Write(pkt)
 }

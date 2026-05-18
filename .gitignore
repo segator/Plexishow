@@ -15,3 +15,6 @@ sbom.json
 /.mise/
 /plexishow
 *.sarif
+
+# generated assets
+/assets/placeholder.ts
