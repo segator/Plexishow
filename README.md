@@ -247,8 +247,17 @@ Plexishow is packaged and published as an **OCI Helm Chart** in the GitHub Conta
 helm registry login ghcr.io -u <your-username>
 
 # Install the official release from GHCR
-helm install plexishow oci://ghcr.io/segator/charts/plexishow \
+helm install plexishow oci://ghcr.io/segator/plexishow \
   --version 1.0.0 \
+  --set config.m3u_url="https://example.com/playlist.m3u" \
+  --set config.epg_url="https://example.com/epg.xml"
+```
+
+To install the latest development version built from the `main` branch:
+
+```bash
+helm install plexishow oci://ghcr.io/segator/plexishow \
+  --version 0.0.0-dev \
   --set config.m3u_url="https://example.com/playlist.m3u" \
   --set config.epg_url="https://example.com/epg.xml"
 ```

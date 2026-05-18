@@ -311,7 +311,7 @@ func (Helm) Publish(ctx context.Context) error {
 		owner = "segator" // Fallback to original owner
 	}
 
-	ociURL := fmt.Sprintf("oci://ghcr.io/%s/charts", strings.ToLower(owner))
+	ociURL := fmt.Sprintf("oci://ghcr.io/%s", strings.ToLower(owner))
 	return sh.RunV("helm", "push", chartTar, ociURL)
 }
 
