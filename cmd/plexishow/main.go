@@ -48,6 +48,19 @@ func main() {
 	refreshInterval := flag.String("refresh-interval", "", "M3U refresh interval (overrides config/env)")
 	token := flag.String("token", "", "X-TCDN-token for all channels (overrides M3U stream_headers)")
 	logsDir := flag.String("logs-dir", "", "Directory to write per-channel ffmpeg logs (optional)")
+	transcode := flag.Bool("transcode", false, "Enable full real-time CPU transcoding instead of direct copy")
+	ffmpegProbesize := flag.String("ffmpeg-probesize", "", "FFmpeg probesize")
+	ffmpegAnalyzeduration := flag.String("ffmpeg-analyzeduration", "", "FFmpeg analyzeduration")
+	ffmpegTranscode := flag.Bool("ffmpeg-transcode", false, "FFmpeg enable transcoding")
+	ffmpegHWAccel := flag.String("ffmpeg-hwaccel", "", "FFmpeg hardware acceleration: nvenc, vaapi, qsv")
+	ffmpegPreset := flag.String("ffmpeg-preset", "", "FFmpeg encoder preset")
+	ffmpegCRF := flag.Int("ffmpeg-crf", 0, "FFmpeg CRF / quality parameter")
+	ffmpegAudioBitrate := flag.String("ffmpeg-audio-bitrate", "", "FFmpeg audio bitrate")
+	ffmpegVAAPIDevice := flag.String("ffmpeg-vaapi-device", "", "FFmpeg VAAPI device path")
+	ffmpegReconnect := flag.Bool("ffmpeg-reconnect", true, "Enable FFmpeg automatic reconnect on HTTP failures")
+	ffmpegReconnectStreamed := flag.Bool("ffmpeg-reconnect-streamed", true, "Enable FFmpeg reconnect for live streams")
+	ffmpegReconnectDelayMax := flag.Int("ffmpeg-reconnect-delay-max", 5, "Maximum delay between reconnect attempts")
+	ffmpegRWTimeout := flag.String("ffmpeg-rw-timeout", "10000000", "Read/Write timeout in microseconds")
 	flag.Parse()
 
 	flags := make(map[string]string)
@@ -78,6 +91,37 @@ func main() {
 	if *logsDir != "" {
 		flags["logs_dir"] = *logsDir
 	}
+	if *transcode {
+		flags["transcode"] = "true"
+	}
+	if *ffmpegProbesize != "" {
+		flags["ffmpeg_probesize"] = *ffmpegProbesize
+	}
+	if *ffmpegAnalyzeduration != "" {
+		flags["ffmpeg_analyzeduration"] = *ffmpegAnalyzeduration
+	}
+	if *ffmpegTranscode {
+		flags["ffmpeg_transcode"] = "true"
+	}
+	if *ffmpegHWAccel != "" {
+		flags["ffmpeg_hwaccel"] = *ffmpegHWAccel
+	}
+	if *ffmpegPreset != "" {
+		flags["ffmpeg_preset"] = *ffmpegPreset
+	}
+	if *ffmpegCRF > 0 {
+		flags["ffmpeg_crf"] = strconv.Itoa(*ffmpegCRF)
+	}
+	if *ffmpegAudioBitrate != "" {
+		flags["ffmpeg_audio_bitrate"] = *ffmpegAudioBitrate
+	}
+	if *ffmpegVAAPIDevice != "" {
+		flags["ffmpeg_vaapi_device"] = *ffmpegVAAPIDevice
+	}
+	flags["ffmpeg_reconnect"] = strconv.FormatBool(*ffmpegReconnect)
+	flags["ffmpeg_reconnect_streamed"] = strconv.FormatBool(*ffmpegReconnectStreamed)
+	flags["ffmpeg_reconnect_delay_max"] = strconv.Itoa(*ffmpegReconnectDelayMax)
+	flags["ffmpeg_rw_timeout"] = *ffmpegRWTimeout
 
 	cfg, err := config.Load(*configPath, flags)
 	if err != nil {
@@ -93,7 +137,10 @@ func main() {
 
 	st := store.New()
 
+	metricsReg := metrics.New()
+
 	fetcher := m3u.NewFetcher(cfg, st)
+	fetcher.SetMetrics(metricsReg)
 	if err := fetcher.Pull(); err != nil {
 		fmt.Fprintf(os.Stderr, "initial m3u fetch: %v\n", err)
 		os.Exit(1)
@@ -104,6 +151,7 @@ func main() {
 	if cfg.EPGURL != "" {
 		fmt.Println("EPG URL:", cfg.EPGURL)
 		epgSource = epg.New(cfg.EPGURL, &http.Client{Timeout: 30 * time.Second})
+		epgSource.SetMetrics(metricsReg)
 		if err := epgSource.Refresh(); err != nil {
 			fmt.Fprintf(os.Stderr, "initial epg fetch: %v\n", err)
 		}
@@ -117,8 +165,6 @@ func main() {
 	} else {
 		fmt.Println("EPG: not configured (no url-tvg in M3U, no -epg-url flag, no PLEXISHOW_EPG_URL env)")
 	}
-
-	metricsReg := metrics.New()
 
 	streamer := stream.NewManager(*cfg, st, metricsReg)
 

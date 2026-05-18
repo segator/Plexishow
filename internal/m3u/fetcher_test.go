@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aymerici/plexishow/internal/config"
+	"github.com/aymerici/plexishow/internal/metrics"
 )
 
 type fakeStore struct {
@@ -43,6 +44,9 @@ http://s/stream.mpd
 		DefaultHeaders: config.Headers{Token: "abc", Referer: "ref", UserAgent: "ua"},
 		StreamTimeout:  5 * time.Second,
 	}, st)
+
+	metricsReg := metrics.New()
+	f.SetMetrics(metricsReg)
 
 	if err := f.Pull(); err != nil {
 		t.Fatal(err)

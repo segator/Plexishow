@@ -18,7 +18,24 @@ type Config struct {
 	RefreshInterval time.Duration `yaml:"refresh_interval"`
 	FFmpegPath      string        `yaml:"ffmpeg_path"`
 	LogsDir         string        `yaml:"logs_dir"`
+	Transcode       bool          `yaml:"transcode"`
 	DefaultHeaders  Headers       `yaml:"default_headers"`
+	FFmpeg          FFmpegConfig  `yaml:"ffmpeg"`
+}
+
+type FFmpegConfig struct {
+	Probesize         string `yaml:"probesize"`
+	Analyzeduration   string `yaml:"analyzeduration"`
+	Transcode         bool   `yaml:"transcode"`
+	HWAccel           string `yaml:"hwaccel"`
+	Preset            string `yaml:"preset"`
+	CRF               int    `yaml:"crf"`
+	AudioBitrate      string `yaml:"audio_bitrate"`
+	VAAPIDevice       string `yaml:"vaapi_device"`
+	Reconnect         bool   `yaml:"reconnect"`
+	ReconnectStreamed bool   `yaml:"reconnect_streamed"`
+	ReconnectDelayMax int    `yaml:"reconnect_delay_max"`
+	RWTimeout         string `yaml:"rw_timeout"`
 }
 
 type Headers struct {
@@ -39,6 +56,12 @@ func Load(filePath string, flags map[string]string) (*Config, error) {
 
 	applyEnv(cfg)
 	applyFlags(cfg, flags)
+
+	// Sync root-level transcode with nested FFmpeg.Transcode for backward compatibility
+	if cfg.Transcode {
+		cfg.FFmpeg.Transcode = true
+	}
+
 	return cfg, nil
 }
 
@@ -49,6 +72,16 @@ func applyDefaults(cfg *Config) {
 	cfg.RefreshInterval = 5 * time.Minute
 	cfg.FFmpegPath = "ffmpeg"
 	cfg.LogsDir = "/tmp/plexishow-logs"
+	cfg.FFmpeg.Probesize = "1500000"
+	cfg.FFmpeg.Analyzeduration = "1000000"
+	cfg.FFmpeg.Preset = "veryfast"
+	cfg.FFmpeg.CRF = 18
+	cfg.FFmpeg.AudioBitrate = "192k"
+	cfg.FFmpeg.VAAPIDevice = "/dev/dri/renderD128"
+	cfg.FFmpeg.Reconnect = true
+	cfg.FFmpeg.ReconnectStreamed = true
+	cfg.FFmpeg.ReconnectDelayMax = 5
+	cfg.FFmpeg.RWTimeout = "10000000"
 }
 
 func loadFromFile(path string, cfg *Config) error {

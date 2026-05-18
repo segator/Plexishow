@@ -12,7 +12,7 @@ It fetches encrypted M3U playlists, parses per-channel ClearKey metadata, and ex
 The application is written in Go (1.22+) and uses a clean, package-oriented structure:
 
 - **`cmd/plexishow/`**: The main entrypoint. Handles flag parsing, wiring dependencies, and running the HTTP server.
-- **`internal/config/`**: Unified configuration loading supporting YAML files, environment variables (`PLEXISHOW_*`), and CLI flags. Precedence: Flags > Env > File > Defaults.
+- **`internal/config/`**: Unified configuration loading supporting YAML files, environment variables (`PLEXISHOW_*`), and CLI flags. Precedence: Flags > Env > File > Defaults. Supports a dedicated `ffmpeg` configuration block for real-time CPU/GPU transcoding (NVENC, VAAPI, QSV) and network reconnection options.
 - **`internal/m3u/`**: M3U parser that extracts EXTINF, KODIPROP, EXTVLCOPT, and ClearKey metadata into a standard `Channel` model.
 - **`internal/store/`**: An in-memory, thread-safe registry holding parsed channels.
 - **`internal/hdhr/`**: HDHomeRun API implementation (serves `/discover.json`, `/lineup.json`, `/device.xml`).

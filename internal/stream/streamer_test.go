@@ -61,15 +61,163 @@ func TestShutdown(t *testing.T) {
 
 func TestBuildArgsNoKey(t *testing.T) {
 	ch := m3u.Channel{URL: "http://example.com/stream.mpd"}
-	args := buildArgs(ch)
+	cfg := defaultTestFFmpegConfig()
+	cfg.Transcode = false
+	args := buildArgs(ch, cfg)
 	want := []string{
 		"-y",
-		"-probesize", "5000000",
-		"-analyzeduration", "2000000",
+		"-probesize", "1500000",
+		"-analyzeduration", "1000000",
+		"-fflags", "+igndts+genpts",
+		"-reconnect", "1",
+		"-reconnect_streamed", "1",
+		"-reconnect_delay_max", "5",
+		"-rw_timeout", "10000000",
 		"-i", "http://example.com/stream.mpd",
 		"-map", "0:v:0", "-map", "0:a:0",
 		"-c:v", "copy",
-		"-c:a", "aac",
+		"-c:a", "copy",
+		"-avoid_negative_ts", "make_zero",
+		"-max_muxing_queue_size", "9999",
+		"-f", "mpegts",
+		"-",
+	}
+	if len(args) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(args), args)
+	}
+	for i, v := range want {
+		if args[i] != v {
+			t.Errorf("arg[%d] = %q, want %q", i, args[i], v)
+		}
+	}
+}
+
+func TestBuildArgsTranscode(t *testing.T) {
+	ch := m3u.Channel{URL: "http://example.com/stream.mpd"}
+	cfg := defaultTestFFmpegConfig()
+	cfg.Transcode = true
+	args := buildArgs(ch, cfg)
+	want := []string{
+		"-y",
+		"-probesize", "1500000",
+		"-analyzeduration", "1000000",
+		"-fflags", "+igndts+genpts",
+		"-reconnect", "1",
+		"-reconnect_streamed", "1",
+		"-reconnect_delay_max", "5",
+		"-rw_timeout", "10000000",
+		"-i", "http://example.com/stream.mpd",
+		"-map", "0:v:0", "-map", "0:a:0",
+		"-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+		"-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1",
+		"-avoid_negative_ts", "make_zero",
+		"-max_muxing_queue_size", "9999",
+		"-f", "mpegts",
+		"-",
+	}
+	if len(args) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(args), args)
+	}
+	for i, v := range want {
+		if args[i] != v {
+			t.Errorf("arg[%d] = %q, want %q", i, args[i], v)
+		}
+	}
+}
+
+func TestBuildArgsNVENC(t *testing.T) {
+	ch := m3u.Channel{URL: "http://example.com/stream.mpd"}
+	cfg := defaultTestFFmpegConfig()
+	cfg.Transcode = true
+	cfg.HWAccel = "nvenc"
+	cfg.Preset = "p4"
+	args := buildArgs(ch, cfg)
+	want := []string{
+		"-y",
+		"-probesize", "1500000",
+		"-analyzeduration", "1000000",
+		"-fflags", "+igndts+genpts",
+		"-reconnect", "1",
+		"-reconnect_streamed", "1",
+		"-reconnect_delay_max", "5",
+		"-rw_timeout", "10000000",
+		"-i", "http://example.com/stream.mpd",
+		"-map", "0:v:0", "-map", "0:a:0",
+		"-c:v", "h264_nvenc", "-preset", "p4", "-cq", "18",
+		"-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1",
+		"-avoid_negative_ts", "make_zero",
+		"-max_muxing_queue_size", "9999",
+		"-f", "mpegts",
+		"-",
+	}
+	if len(args) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(args), args)
+	}
+	for i, v := range want {
+		if args[i] != v {
+			t.Errorf("arg[%d] = %q, want %q", i, args[i], v)
+		}
+	}
+}
+
+func TestBuildArgsVAAPI(t *testing.T) {
+	ch := m3u.Channel{URL: "http://example.com/stream.mpd"}
+	cfg := defaultTestFFmpegConfig()
+	cfg.Transcode = true
+	cfg.HWAccel = "vaapi"
+	cfg.VAAPIDevice = "/dev/dri/renderD129"
+	args := buildArgs(ch, cfg)
+	want := []string{
+		"-y",
+		"-vaapi_device", "/dev/dri/renderD129",
+		"-probesize", "1500000",
+		"-analyzeduration", "1000000",
+		"-fflags", "+igndts+genpts",
+		"-reconnect", "1",
+		"-reconnect_streamed", "1",
+		"-reconnect_delay_max", "5",
+		"-rw_timeout", "10000000",
+		"-i", "http://example.com/stream.mpd",
+		"-map", "0:v:0", "-map", "0:a:0",
+		"-vf", "format=nv12,hwupload",
+		"-c:v", "h264_vaapi", "-qp", "18",
+		"-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1",
+		"-avoid_negative_ts", "make_zero",
+		"-max_muxing_queue_size", "9999",
+		"-f", "mpegts",
+		"-",
+	}
+	if len(args) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(args), args)
+	}
+	for i, v := range want {
+		if args[i] != v {
+			t.Errorf("arg[%d] = %q, want %q", i, args[i], v)
+		}
+	}
+}
+
+func TestBuildArgsQSV(t *testing.T) {
+	ch := m3u.Channel{URL: "http://example.com/stream.mpd"}
+	cfg := defaultTestFFmpegConfig()
+	cfg.Transcode = true
+	cfg.HWAccel = "qsv"
+	cfg.Preset = "veryfast"
+	args := buildArgs(ch, cfg)
+	want := []string{
+		"-y",
+		"-probesize", "1500000",
+		"-analyzeduration", "1000000",
+		"-fflags", "+igndts+genpts",
+		"-reconnect", "1",
+		"-reconnect_streamed", "1",
+		"-reconnect_delay_max", "5",
+		"-rw_timeout", "10000000",
+		"-i", "http://example.com/stream.mpd",
+		"-map", "0:v:0", "-map", "0:a:0",
+		"-c:v", "h264_qsv", "-preset", "veryfast", "-global_quality", "18",
+		"-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1",
+		"-avoid_negative_ts", "make_zero",
 		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
 		"-",
@@ -86,7 +234,7 @@ func TestBuildArgsNoKey(t *testing.T) {
 
 func TestBuildArgsWithKey(t *testing.T) {
 	ch := m3u.Channel{URL: "http://example.com/stream.mpd", KeyID: "kid1", Key: "key1"}
-	args := buildArgs(ch)
+	args := buildArgs(ch, defaultTestFFmpegConfig())
 	found := false
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "-cenc_decryption_key" && args[i+1] == "key1" {
@@ -104,7 +252,7 @@ func TestBuildArgsWithHeaders(t *testing.T) {
 		URL:     "http://example.com/stream.mpd",
 		Headers: map[string]string{"User-Agent": "TestAgent", "Referer": "https://tv.example.com/", "X-TCDN-token": "tok123"},
 	}
-	args := buildArgs(ch)
+	args := buildArgs(ch, defaultTestFFmpegConfig())
 
 	// User-Agent should become -user_agent
 	foundUA := false
@@ -231,6 +379,21 @@ func TestSessionAddSubFalse(t *testing.T) {
 	}
 	ch := make(chan []byte, 1)
 	if sess.addSub(ch) {
-		t.Fatal("addSub should return false when subs is nil")
+		t.Fatal("addSub should return should return false when subs is nil")
+	}
+}
+
+func defaultTestFFmpegConfig() config.FFmpegConfig {
+	return config.FFmpegConfig{
+		Probesize:         "1500000",
+		Analyzeduration:   "1000000",
+		Preset:            "veryfast",
+		CRF:               18,
+		AudioBitrate:      "192k",
+		VAAPIDevice:       "/dev/dri/renderD128",
+		Reconnect:         true,
+		ReconnectStreamed: true,
+		ReconnectDelayMax: 5,
+		RWTimeout:         "10000000",
 	}
 }

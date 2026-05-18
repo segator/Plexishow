@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/aymerici/plexishow/internal/metrics"
 )
 
 type Source struct {
-	url    string
-	client *http.Client
-	cache  []byte
-	mu     sync.RWMutex
-	last   time.Time
+	url     string
+	client  *http.Client
+	cache   []byte
+	mu      sync.RWMutex
+	last    time.Time
+	metrics *metrics.Registry
 }
 
 func New(url string, client *http.Client) *Source {
@@ -22,6 +25,10 @@ func New(url string, client *http.Client) *Source {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	return &Source{url: url, client: client}
+}
+
+func (s *Source) SetMetrics(m *metrics.Registry) {
+	s.metrics = m
 }
 
 func (s *Source) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -57,5 +64,8 @@ func (s *Source) Refresh() error {
 	s.cache = data
 	s.last = time.Now()
 	s.mu.Unlock()
+	if s.metrics != nil {
+		s.metrics.SetEPGLastRefresh(time.Now().Unix())
+	}
 	return nil
 }

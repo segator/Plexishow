@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aymerici/plexishow/internal/config"
+	"github.com/aymerici/plexishow/internal/metrics"
 )
 
 // ChannelStore is the interface required by Fetcher to persist channels.
@@ -16,9 +17,10 @@ type ChannelStore interface {
 }
 
 type Fetcher struct {
-	cfg    *config.Config
-	store  ChannelStore
-	client *http.Client
+	cfg     *config.Config
+	store   ChannelStore
+	client  *http.Client
+	metrics *metrics.Registry
 }
 
 func NewFetcher(cfg *config.Config, s ChannelStore) *Fetcher {
@@ -27,6 +29,10 @@ func NewFetcher(cfg *config.Config, s ChannelStore) *Fetcher {
 		store:  s,
 		client: &http.Client{Timeout: cfg.StreamTimeout},
 	}
+}
+
+func (f *Fetcher) SetMetrics(m *metrics.Registry) {
+	f.metrics = m
 }
 
 func (f *Fetcher) Pull() error {
@@ -81,6 +87,10 @@ func (f *Fetcher) Pull() error {
 	}
 
 	f.store.Replace(channels)
+	if f.metrics != nil {
+		f.metrics.SetM3UChannels(len(channels))
+		f.metrics.SetLastRefresh(time.Now().Unix())
+	}
 	return nil
 }
 

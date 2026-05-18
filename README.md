@@ -67,6 +67,21 @@ default_headers:
   token: "your-token"
   referer: "https://example.com"
   user_agent: "Plexishow/1.0"
+
+# Advanced FFmpeg Settings (All optional, defaults shown below)
+ffmpeg:
+  transcode: false                # Enable real-time transcoding instead of direct copy
+  hwaccel: ""                     # Hardware acceleration engine: "" (CPU), "nvenc", "vaapi", "qsv"
+  preset: "veryfast"              # Encoder preset (e.g., veryfast, ultrafast, or p4 for NVENC)
+  crf: 18                         # Constant Rate Factor / quality parameter (18-23 is recommended)
+  audio_bitrate: "192k"           # Audio bitrate (e.g., 128k, 192k)
+  vaapi_device: "/dev/dri/renderD128" # Path to your VAAPI rendering device (AMD/Intel)
+  reconnect: true                 # Automatically reconnect to stream on network drops
+  reconnect_streamed: true        # Automatically reconnect live HTTP feeds (DASH/HLS)
+  reconnect_delay_max: 5          # Maximum delay in seconds before retrying reconnect
+  rw_timeout: "10000000"          # Read/write socket timeout in microseconds (10s)
+  probesize: "1500000"            # Probe buffer size in bytes for analyzing stream
+  analyzeduration: "1000000"      # Maximum time in microseconds to analyze stream
 ```
 
 ### Environment Variables
@@ -82,6 +97,18 @@ default_headers:
 | `PLEXISHOW_FFMPEG_PATH` | Optional | Path to ffmpeg binary (default `ffmpeg`) |
 | `PLEXISHOW_BASE_URL` | Optional | Base URL advertised to clients |
 | `PLEXISHOW_TOKEN` | Optional | X-TCDN-token for all channels |
+| `PLEXISHOW_FFMPEG_TRANSCODE` | Optional | Enable full real-time transcoding (default `false`) |
+| `PLEXISHOW_FFMPEG_HWACCEL` | Optional | GPU hardware accelerator (`nvenc`, `vaapi`, `qsv`, default `""`) |
+| `PLEXISHOW_FFMPEG_PRESET` | Optional | Codifier preset (default `"veryfast"`) |
+| `PLEXISHOW_FFMPEG_CRF` | Optional | CRF quality parameter (default `18`) |
+| `PLEXISHOW_FFMPEG_AUDIO_BITRATE`| Optional| Transcoded audio stream bitrate (default `"192k"`) |
+| `PLEXISHOW_FFMPEG_VAAPI_DEVICE` | Optional | AMD/Intel VAAPI graphics device path (default `"/dev/dri/renderD128"`) |
+| `PLEXISHOW_FFMPEG_RECONNECT` | Optional | Automatically reconnect HTTP socket on network failures (default `true`) |
+| `PLEXISHOW_FFMPEG_RECONNECT_STREAMED` | Optional | Auto-reconnect live streamed HTTP payloads (default `true`) |
+| `PLEXISHOW_FFMPEG_RECONNECT_DELAY_MAX` | Optional | Maximum delay in seconds between reconnect tries (default `5`) |
+| `PLEXISHOW_FFMPEG_RW_TIMEOUT` | Optional | Read-write timeout threshold in microseconds (default `"10000000"`) |
+| `PLEXISHOW_FFMPEG_PROBESIZE` | Optional | Analysis buffer probing size in bytes (default `"1500000"`) |
+| `PLEXISHOW_FFMPEG_ANALYZE_DURATION` | Optional | Maximum analysis duration in microseconds (default `"1000000"`) |
 
 ### CLI Flags
 
@@ -94,6 +121,18 @@ default_headers:
 - **`-stream-timeout`** *(Optional)*: Per-stream idle timeout (overrides config/env).
 - **`-refresh-interval`** *(Optional)*: M3U refresh interval (overrides config/env).
 - **`-token`** *(Optional)*: X-TCDN-token for all channels (overrides M3U stream_headers).
+- **`-ffmpeg-transcode`** *(Optional)*: Enable transcoding (overrides config/env, default `false`).
+- **`-ffmpeg-hwaccel`** *(Optional)*: Set GPU acceleration: `nvenc`, `vaapi`, `qsv` (overrides config/env).
+- **`-ffmpeg-preset`** *(Optional)*: Codec speed preset (overrides config/env).
+- **`-ffmpeg-crf`** *(Optional)*: Quality/CRF level (overrides config/env).
+- **`-ffmpeg-audio-bitrate`** *(Optional)*: Trascoded audio bit rate (overrides config/env).
+- **`-ffmpeg-vaapi-device`** *(Optional)*: VAAPI hardware driver device (overrides config/env).
+- **`-ffmpeg-reconnect`** *(Optional)*: Toggle HTTP autoconnect (default `true`, overrides config/env).
+- **`-ffmpeg-reconnect-streamed`** *(Optional)*: Toggle live HTTP stream autoconnect (default `true`, overrides config/env).
+- **`-ffmpeg-reconnect-delay-max`** *(Optional)*: Max delay in seconds for reconnection (overrides config/env).
+- **`-ffmpeg-rw-timeout`** *(Optional)*: R/W timeout in microseconds (overrides config/env).
+- **`-ffmpeg-probesize`** *(Optional)*: Probesize in bytes (overrides config/env).
+- **`-ffmpeg-analyzeduration`** *(Optional)*: Analyzeduration in microseconds (overrides config/env).
 
 ---
 
@@ -198,6 +237,11 @@ Plexishow exposes Prometheus-compatible metrics at `/metrics`.
 |--------|------|-------------|
 | `plexishow_active_streams` | gauge | Current active ffmpeg streams |
 | `plexishow_stream_errors_total` | counter | Total stream errors |
+| `plexishow_channel_viewers` | gauge | Current viewers per channel (labeled by `channel`) |
+| `plexishow_channel_bytes_sent_total` | counter | Total egress bytes served to clients per channel (labeled by `channel`) |
+| `plexishow_m3u_channels_total` | gauge | Total channels successfully parsed and loaded from the M3U playlist |
+| `plexishow_m3u_last_refresh_timestamp_seconds` | gauge | Unix epoch timestamp of the last successful M3U refresh |
+| `plexishow_epg_last_refresh_timestamp_seconds` | gauge | Unix epoch timestamp of the last successful EPG guide refresh |
 
 ### Go Runtime Metrics
 
