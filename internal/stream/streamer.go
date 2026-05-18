@@ -41,22 +41,123 @@ func channelColor(name string) string {
 	return ansiColors[int(h.Sum32())%len(ansiColors)]
 }
 
+const defaultIdleTimeout = 30 * time.Second
+
+type session struct {
+	cmd         *exec.Cmd
+	stdout      io.ReadCloser
+	cancel      context.CancelFunc
+	mu          sync.Mutex
+	subs        map[chan []byte]struct{}
+	done        chan struct{}
+	idleTimer   *time.Timer
+	idleTimeout time.Duration
+}
+
+func (s *session) addSub(ch chan []byte) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.subs == nil {
+		return false
+	}
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
+	s.subs[ch] = struct{}{}
+	return true
+}
+
+func (s *session) removeSub(ch chan []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.subs == nil {
+		return
+	}
+	delete(s.subs, ch)
+	close(ch)
+	if len(s.subs) == 0 && s.idleTimer == nil {
+		timeout := s.idleTimeout
+		if timeout == 0 {
+			timeout = defaultIdleTimeout
+		}
+		s.idleTimer = time.AfterFunc(timeout, func() {
+			s.kill()
+		})
+	}
+}
+
+func (s *session) kill() {
+	s.cancel()
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
+	}
+}
+
+func (s *session) broadcast(stderr io.ReadCloser, name string) {
+	defer close(s.done)
+	if stderr != nil {
+		go func() {
+			color := channelColor(name)
+			scanner := bufio.NewScanner(stderr)
+			for scanner.Scan() {
+				fmt.Printf("%s[%s]%s %s\n", color, name, ansiReset, scanner.Text())
+			}
+		}()
+	}
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := s.stdout.Read(buf)
+		if n > 0 {
+			data := append([]byte(nil), buf[:n]...)
+			s.mu.Lock()
+			for ch := range s.subs {
+				select {
+				case ch <- data:
+				default:
+					close(ch)
+					delete(s.subs, ch)
+				}
+			}
+			s.mu.Unlock()
+		}
+		if err != nil {
+			break
+		}
+	}
+	if s.stdout != nil {
+		_ = s.stdout.Close()
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
+	}
+	if s.cmd != nil {
+		_ = s.cmd.Wait()
+	}
+	s.mu.Lock()
+	for ch := range s.subs {
+		close(ch)
+	}
+	s.subs = nil
+	s.mu.Unlock()
+}
+
 type Manager struct {
-	cfg     config.Config
-	store   *store.Store
-	metrics *metrics.Registry
-	mu      sync.Mutex
-	active  map[string]*exec.Cmd
-	sem     chan struct{}
+	cfg      config.Config
+	store    *store.Store
+	metrics  *metrics.Registry
+	mu       sync.Mutex
+	sessions map[string]*session
+	sem      chan struct{}
 }
 
 func NewManager(cfg config.Config, st *store.Store, metrics *metrics.Registry) *Manager {
 	return &Manager{
-		cfg:     cfg,
-		store:   st,
-		metrics: metrics,
-		active:  make(map[string]*exec.Cmd),
-		sem:     make(chan struct{}, cfg.MaxStreams),
+		cfg:      cfg,
+		store:    st,
+		metrics:  metrics,
+		sessions: make(map[string]*session),
+		sem:      make(chan struct{}, cfg.MaxStreams),
 	}
 }
 
@@ -68,55 +169,34 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	select {
-	case m.sem <- struct{}{}:
-	default:
-		http.Error(w, "max concurrent streams reached", http.StatusServiceUnavailable)
-		return
-	}
-	defer func() { <-m.sem }()
+	chData := make(chan []byte, 50)
+	defer close(chData)
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
+	m.mu.Lock()
+	sess, exists := m.sessions[id]
+	m.mu.Unlock()
 
-	args := buildArgs(ch)
-	fmt.Printf("[stream] %s: %s %s\n", ch.Name, m.cfg.FFmpegPath, strings.Join(args, " "))
-	//#nosec G204 -- ffmpeg path from config, intentional
-	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		m.metrics.IncErrors()
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	stderr, _ := cmd.StderrPipe()
-	defer func() { _ = stdout.Close() }()
-	if stderr != nil {
-		go func() {
-			color := channelColor(ch.Name)
-			scanner := bufio.NewScanner(stderr)
-			for scanner.Scan() {
-				fmt.Printf("%s[%s]%s %s\n", color, ch.Name, ansiReset, scanner.Text())
-			}
-		}()
-	}
-
-	if err := cmd.Start(); err != nil {
-		m.metrics.IncErrors()
-		http.Error(w, "failed to start stream", http.StatusInternalServerError)
-		return
-	}
-	m.metrics.IncActive()
-	defer m.metrics.DecActive()
-	m.track(ch.ID, cmd)
-	defer m.untrack(ch.ID)
-	defer func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
+	if !exists || !sess.addSub(chData) {
+		if exists {
+			// session died between the unlock and addSub
 		}
-		_ = cmd.Wait()
-	}()
+		select {
+		case m.sem <- struct{}{}:
+		default:
+			http.Error(w, "max concurrent streams reached", http.StatusServiceUnavailable)
+			return
+		}
+		var err error
+		sess, err = m.startSession(ch)
+		if err != nil {
+			<-m.sem
+			m.metrics.IncErrors()
+			http.Error(w, "failed to start stream", http.StatusInternalServerError)
+			return
+		}
+		sess.addSub(chData)
+	}
+	defer sess.removeSub(chData)
 
 	w.Header().Set("Content-Type", "video/mp2t")
 	w.WriteHeader(http.StatusOK)
@@ -127,38 +207,89 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	timer := time.NewTimer(m.cfg.StreamTimeout)
 	defer timer.Stop()
-	done := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(w, stdout)
-		close(done)
-	}()
 
-	select {
-	case <-done:
-	case <-ctx.Done():
-	case <-timer.C:
+	for {
+		select {
+		case data, ok := <-chData:
+			if !ok {
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				return
+			}
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(m.cfg.StreamTimeout)
+		case <-r.Context().Done():
+			return
+		case <-timer.C:
+			return
+		}
 	}
 }
 
-func (m *Manager) track(id string, cmd *exec.Cmd) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.active[id] = cmd
-}
+func (m *Manager) startSession(ch m3u.Channel) (*session, error) {
+	ctx, cancel := context.WithCancel(context.Background())
 
-func (m *Manager) untrack(id string) {
+	args := buildArgs(ch)
+	fmt.Printf("[stream] %s: %s %s\n", ch.Name, m.cfg.FFmpegPath, strings.Join(args, " "))
+	//#nosec G204 -- ffmpeg path from config, intentional
+	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	stderr, _ := cmd.StderrPipe()
+
+	if err := cmd.Start(); err != nil {
+		cancel()
+		_ = stdout.Close()
+		if stderr != nil {
+			_ = stderr.Close()
+		}
+		return nil, err
+	}
+	m.metrics.IncActive()
+
+	sess := &session{
+		cmd:         cmd,
+		stdout:      stdout,
+		cancel:      cancel,
+		subs:        make(map[chan []byte]struct{}),
+		done:        make(chan struct{}),
+		idleTimeout: defaultIdleTimeout,
+	}
+
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.active, id)
+	m.sessions[ch.ID] = sess
+	m.mu.Unlock()
+
+	go func() {
+		sess.broadcast(stderr, ch.Name)
+		m.mu.Lock()
+		delete(m.sessions, ch.ID)
+		m.mu.Unlock()
+		<-m.sem
+		m.metrics.DecActive()
+	}()
+
+	return sess, nil
 }
 
 func (m *Manager) Shutdown() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, cmd := range m.active {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-		}
+	for _, sess := range m.sessions {
+		sess.kill()
 	}
 }
 

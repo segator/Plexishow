@@ -1,8 +1,10 @@
 package stream
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -130,5 +132,101 @@ func TestBuildArgsWithHeaders(t *testing.T) {
 	}
 	if !strings.Contains(hdrValue, "X-TCDN-token: tok123") {
 		t.Errorf("missing X-TCDN-token in headers: %q", hdrValue)
+	}
+}
+
+func TestBroadcastMultiplex(t *testing.T) {
+	pr, pw := io.Pipe()
+	sess := &session{
+		stdout: pr,
+		cancel: func() {},
+		subs:   make(map[chan []byte]struct{}),
+		done:   make(chan struct{}),
+	}
+
+	ch1 := make(chan []byte, 10)
+	ch2 := make(chan []byte, 10)
+	if !sess.addSub(ch1) {
+		t.Fatal("addSub returned false for fresh session")
+	}
+	if !sess.addSub(ch2) {
+		t.Fatal("addSub returned false for fresh session")
+	}
+
+	go sess.broadcast(nil, "test")
+
+	_, _ = pw.Write([]byte("hello"))
+	_ = pw.Close()
+
+	var got1, got2 string
+	select {
+	case b := <-ch1:
+		got1 = string(b)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for ch1")
+	}
+	select {
+	case b := <-ch2:
+		got2 = string(b)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for ch2")
+	}
+
+	if got1 != "hello" {
+		t.Errorf("ch1 got %q, want hello", got1)
+	}
+	if got2 != "hello" {
+		t.Errorf("ch2 got %q, want hello", got2)
+	}
+
+	<-sess.done
+}
+
+func TestSessionIdleTimeout(t *testing.T) {
+	cmd := exec.Command("sleep", "30")
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+	if err := cmd.Start(); err != nil {
+		t.Skip("cannot start test process:", err)
+	}
+
+	sess := &session{
+		cmd:         cmd,
+		stdout:      stdout,
+		cancel:      func() { _ = cmd.Process.Kill() },
+		subs:        make(map[chan []byte]struct{}),
+		done:        make(chan struct{}),
+		idleTimeout: 100 * time.Millisecond,
+	}
+
+	go sess.broadcast(stderr, "test")
+
+	ch := make(chan []byte, 1)
+	if !sess.addSub(ch) {
+		t.Fatal("addSub returned false for fresh session")
+	}
+	sess.removeSub(ch)
+
+	select {
+	case <-sess.done:
+		// ok
+	case <-time.After(2 * time.Second):
+		t.Fatal("session did not die after idle timeout")
+	}
+
+	if cmd.ProcessState == nil {
+		t.Fatal("process did not exit")
+	}
+}
+
+func TestSessionAddSubFalse(t *testing.T) {
+	sess := &session{
+		cancel: func() {},
+		subs:   nil,
+		done:   make(chan struct{}),
+	}
+	ch := make(chan []byte, 1)
+	if sess.addSub(ch) {
+		t.Fatal("addSub should return false when subs is nil")
 	}
 }

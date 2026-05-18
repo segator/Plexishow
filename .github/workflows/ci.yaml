@@ -39,10 +39,10 @@ jobs:
       - name: Test
         run: mage test
 
-      - name: Build Docker images
+      - name: Build Docker image
         run: mage docker:build
 
-      - name: Publish Docker images
+      - name: Publish Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: mage docker:publish
         env:

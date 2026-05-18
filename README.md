@@ -71,36 +71,29 @@ default_headers:
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PLEXISHOW_M3U_URL` | M3U playlist URL |
-| `PLEXISHOW_EPG_URL` | EPG XMLTV URL |
-| `PLEXISHOW_LISTEN_ADDR` | HTTP listen address (default `:8080`) |
-| `PLEXISHOW_MAX_STREAMS` | Max concurrent streams (default `4`) |
-| `PLEXISHOW_STREAM_TIMEOUT` | Per-stream idle timeout (default `30s`) |
-| `PLEXISHOW_REFRESH_INTERVAL` | M3U refresh interval (default `1h`) |
-| `PLEXISHOW_FFMPEG_PATH` | Path to ffmpeg binary (default `ffmpeg`) |
+| Variable | Requirement | Description |
+|----------|-------------|-------------|
+| `PLEXISHOW_M3U_URL` | **Mandatory** | M3U playlist URL |
+| `PLEXISHOW_EPG_URL` | Optional | EPG XMLTV URL |
+| `PLEXISHOW_LISTEN_ADDR` | Optional | HTTP listen address (default `:8080`) |
+| `PLEXISHOW_MAX_STREAMS` | Optional | Max concurrent streams (default `4`) |
+| `PLEXISHOW_STREAM_TIMEOUT` | Optional | Per-stream idle timeout (default `30s`) |
+| `PLEXISHOW_REFRESH_INTERVAL`| Optional | M3U refresh interval (default `1h`) |
+| `PLEXISHOW_FFMPEG_PATH` | Optional | Path to ffmpeg binary (default `ffmpeg`) |
+| `PLEXISHOW_BASE_URL` | Optional | Base URL advertised to clients |
+| `PLEXISHOW_TOKEN` | Optional | X-TCDN-token for all channels |
 
 ### CLI Flags
 
-```
--config string
-    Path to config file (default "config.yaml")
--m3u-url string
-    M3U playlist URL (overrides config/env)
--epg-url string
-    EPG XMLTV URL (overrides config/env)
--base-url string
-    Base URL advertised to clients (overrides config/env)
--listen-addr string
-    HTTP listen address (overrides config/env)
--max-streams int
-    Max concurrent streams (overrides config/env)
--stream-timeout string
-    Per-stream idle timeout (overrides config/env)
--refresh-interval string
-    M3U refresh interval (overrides config/env)
-```
+- **`-m3u-url`** *(Mandatory)*: M3U playlist URL (overrides config/env). This is the only required parameter.
+- **`-config`** *(Optional)*: Path to config file (default "config.yaml").
+- **`-epg-url`** *(Optional)*: EPG XMLTV URL (overrides config/env).
+- **`-base-url`** *(Optional)*: Base URL advertised to clients (overrides config/env).
+- **`-listen-addr`** *(Optional)*: HTTP listen address (default ":8080", overrides config/env).
+- **`-max-streams`** *(Optional)*: Max concurrent streams (overrides config/env).
+- **`-stream-timeout`** *(Optional)*: Per-stream idle timeout (overrides config/env).
+- **`-refresh-interval`** *(Optional)*: M3U refresh interval (overrides config/env).
+- **`-token`** *(Optional)*: X-TCDN-token for all channels (overrides M3U stream_headers).
 
 ---
 
@@ -144,20 +137,39 @@ mage run -- -help
 mage run -- -m3u-url "https://example.com/playlist.m3u"
 ```
 
-### Docker
+### Docker Run
+
+The Docker image is published to `ghcr.io/segator/plexishow`.
 
 ```bash
-# Build image
-mage docker
+docker run -d --name plexishow \
+  -p 8080:8080 \
+  -e PLEXISHOW_M3U_URL="https://example.com/playlist.m3u" \
+  ghcr.io/segator/plexishow:latest
 ```
 
-### Docker GPU (VAAPI)
+### Docker Compose
 
-For Intel/AMD GPU hardware-accelerated decoding via VAAPI:
+Create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  plexishow:
+    image: ghcr.io/segator/plexishow:latest
+    container_name: plexishow
+    ports:
+      - "8080:8080"
+    environment:
+      - PLEXISHOW_M3U_URL=https://example.com/playlist.m3u
+      - PLEXISHOW_EPG_URL=https://example.com/epg.xml
+    restart: unless-stopped
+```
+
+Then run:
 
 ```bash
-# Build GPU image
-mage dockergpu
+docker-compose up -d
 ```
 
 ---
@@ -233,7 +245,7 @@ mage bin:build
 mage run
 mage run -- -help
 
-# Build Docker images (standard + GPU)
+# Build Docker image
 mage docker:build
 
 # Publish Docker images
@@ -288,35 +300,7 @@ mage release
 
 ---
 
-## CI / CD
 
-Two workflows run in parallel on every PR and push to `main`:
-
-- **CI** (`.github/workflows/ci.yaml`) — Build, test, and publish pipeline.
-- **Security** (`.github/workflows/security.yaml`) — Vulnerability scanning and SARIF uploads.
-
-### CI Pipeline Steps
-
-1. **Format** — `mage fmt` + `git diff --exit-code`
-2. **Lint** — `mage lint` (golangci-lint)
-3. **Test + Coverage** — `mage test` (race detector + 40% threshold)
-4. **Docker** — `mage docker:build` (standard + GPU images)
-5. **Publish** — `mage docker:publish` to GHCR (only on `main` pushes)
-
-### Security Pipeline Steps
-
-Runs `mage security` which executes in a single step:
-- **govulncheck** — Official Go vulnerability scanner (SARIF)
-- **SBOM** — Syft SPDX JSON generation
-- **Grype** — Container/dependency vulnerability scan (SARIF + table output, fails on critical)
-
-SARIF reports are uploaded to the GitHub Security tab automatically. The security workflow also runs weekly on Mondays at 03:00 UTC.
-
-### Release
-
-Tag pushes (`v*`) trigger GoReleaser via `.github/workflows/release-please.yaml`.
-
----
 
 ## License
 
