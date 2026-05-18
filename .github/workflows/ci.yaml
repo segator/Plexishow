@@ -46,12 +46,12 @@ jobs:
 
       - name: Build Docker image
         run: mage docker:build
+        env:
+          VERSION: dev
 
       - name: Publish Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: mage docker:publish
-        env:
-          VERSION: dev
+        run: docker push ghcr.io/segator/plexishow:dev
 
   release:
     runs-on: ubuntu-latest
