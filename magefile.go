@@ -100,13 +100,21 @@ func (Bin) Build(ctx context.Context) error {
 	if err := os.MkdirAll("bin", 0755); err != nil {
 		return err
 	}
+	// Force static compilation (disable CGO) so that the binary is fully compatible
+	// with Alpine's musl standard library and does not dynamically link to host's glibc.
+	os.Setenv("CGO_ENABLED", "0")
 	ldflags := fmt.Sprintf("-ldflags=-s -w -X main.version=%s", version)
 	return sh.RunV("go", "build", ldflags, "-o", "bin/"+binaryName, "./cmd/plexishow")
 }
 
-// Build compiles the binary and builds the Docker image.
+// Build compiles the binary, builds the Docker image, and packages the Helm chart.
 func Build(ctx context.Context) {
-	mg.Deps(Bin{}.Build, Docker{}.Build)
+	mg.Deps(Bin{}.Build, Docker{}.Build, Helm{}.Build)
+}
+
+// Publish builds and publishes both the multi-arch Docker image and the Helm chart.
+func Publish(ctx context.Context) {
+	mg.Deps(Docker{}.Push, Helm{}.Publish)
 }
 
 // Docker groups Docker image targets.
@@ -254,3 +262,47 @@ func (Generate) Placeholder(ctx context.Context) error {
 	}
 	return sh.RunV("./scripts/generate_placeholder.sh")
 }
+
+// Helm groups Helm-related targets.
+type Helm mg.Namespace
+
+// Build packages the Helm chart into a .tgz file.
+// Use the VERSION env var to override the chart and app version.
+func (Helm) Build(ctx context.Context) error {
+	fmt.Println("Packaging Helm chart...")
+	v := version
+	if strings.HasPrefix(v, "v") {
+		v = v[1:] // Strip leading 'v' for SemVer compliance in Helm
+	}
+	// If it doesn't have dots (e.g. just a commit hash like ce1496b-dirty),
+	// format it as a valid SemVer pre-release version: 0.0.0-<git-ref>
+	if !strings.Contains(v, ".") {
+		v = "0.0.0-" + v
+	}
+	return sh.RunV("helm", "package", "helm/plexishow", "--version", v, "--app-version", v)
+}
+
+// Publish packages and pushes the Helm chart to GHCR as an OCI registry package.
+// Relies on a prior helm registry login.
+func (Helm) Publish(ctx context.Context) error {
+	mg.Deps(Helm{}.Build)
+	fmt.Println("Publishing Helm chart...")
+	v := version
+	if strings.HasPrefix(v, "v") {
+		v = v[1:] // Strip leading 'v'
+	}
+	if !strings.Contains(v, ".") {
+		v = "0.0.0-" + v
+	}
+	chartTar := fmt.Sprintf("plexishow-%s.tgz", v)
+	defer os.Remove(chartTar) // Clean up the tgz file after pushing
+
+	owner := os.Getenv("GITHUB_REPOSITORY_OWNER")
+	if owner == "" {
+		owner = "segator" // Fallback to original owner
+	}
+
+	ociURL := fmt.Sprintf("oci://ghcr.io/%s/charts", strings.ToLower(owner))
+	return sh.RunV("helm", "push", chartTar, ociURL)
+}
+

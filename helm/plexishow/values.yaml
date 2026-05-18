@@ -1,41 +1,69 @@
+# Default values for plexishow.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
 replicaCount: 1
 
 image:
-  repository: ghcr.io/aymerici/plexishow
+  repository: ghcr.io/segator/plexishow
   pullPolicy: IfNotPresent
-  tag: "latest"
+  # If left empty (""), it defaults to .Chart.AppVersion (e.g. 1.0.0).
+  # To test local development or main branch pushes, override this with "dev".
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
+  # Specifies whether a service account should be created
   create: true
+  # Annotations to add to the service account
   annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
   name: ""
 
 podAnnotations: {}
 
 podSecurityContext: {}
+  # fsGroup: 2000
 
 securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
 service:
   type: ClusterIP
   port: 8080
 
-ingress:
+# Modern Kubernetes Gateway API HTTPRoute Configuration
+httproute:
   enabled: false
-  className: ""
   annotations: {}
-  hosts:
-    - host: plexishow.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
+  parentRefs: []
+    # - group: gateway.networking.k8s.io
+    #   kind: Gateway
+    #   name: my-gateway
+    #   namespace: gateway-system
+  hostnames: []
+    # - plexishow.local
 
 resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines or adjust them to your needs.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
 
 nodeSelector: {}
 
@@ -43,15 +71,39 @@ tolerations: []
 
 affinity: {}
 
+# Complete application configuration.
+# Any options defined here will be automatically serialized to the config.yaml file.
+# Reference: https://github.com/segator/Plexishow#yaml-config
 config:
-  m3u_url: ""
-  epg_url: ""
+  # m3u_url: "https://example.com/playlist.m3u"
+  # epg_url: "https://example.com/epg.xml"
   listen_addr: ":8080"
   max_streams: 4
   stream_timeout: "30s"
   refresh_interval: "1h"
   ffmpeg_path: "ffmpeg"
+  
   default_headers:
     token: ""
     referer: ""
-    user_agent: ""
+    user_agent: "Plexishow/1.0"
+  
+  # Advanced configuration options (transcoding, VAAPI/NVENC hardware acceleration, etc.)
+  # Feel free to uncomment and customize these:
+  #
+  # transcode: false
+  #
+  # ffmpeg:
+  #   transcode: false
+  #   hwaccel: ""                       # e.g., "nvenc", "vaapi", "qsv"
+  #   preset: "veryfast"
+  #   crf: 18
+  #   audio_codec: "aac"
+  #   audio_bitrate: "192k"
+  #   vaapi_device: "/dev/dri/renderD128"
+  #   reconnect: true
+  #   reconnect_streamed: true
+  #   reconnect_delay_max: 5
+  #   rw_timeout: "10000000"
+  #   probesize: "500000"
+  #   analyzeduration: "500000"

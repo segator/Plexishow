@@ -20,6 +20,7 @@ The application is written in Go (1.22+) and uses a clean, package-oriented stru
 - **`internal/stream/`**: The streaming engine. Manages `ffmpeg` lifecycles, concurrency limits (semaphore-based), timeouts, and stream proxying.
 - **`internal/server/`**: HTTP routing using the standard library `http.ServeMux`.
 - **`internal/metrics/`**: Prometheus metrics integration (`/metrics`).
+- **`helm/plexishow/`**: Kubernetes Helm Chart. Dynamically generates the application `config.yaml` using a generic `toYaml` map, and features Kubernetes Gateway API `HTTPRoute` exposure instead of traditional Ingress.
 - **`test/fixtures/`**: Contains static files used for testing (e.g., sample M3U playlists).
 
 ## 🛠️ Coding Conventions & Principles
@@ -48,7 +49,11 @@ The application is written in Go (1.22+) and uses a clean, package-oriented stru
 The project uses [Mage](https://magefile.org/) as its build tool instead of `make`.
 
 Here are the key commands to use:
-- `mage build` or `mage bin:build`: Build the Go binary (output in `bin/`).
+- `mage build`: Compiles the binary, builds the local Docker image, and packages the Helm chart into a `.tgz` file.
+- `mage publish`: Builds and publishes both the multi-arch Docker image and the OCI Helm chart to GHCR in a unified flow.
+- `mage bin:build`: Compiles the Go binary into `bin/`.
+- `mage helm:build`: Validates and packages the Helm chart into a SemVer-compliant `.tgz` (includes automatic pre-release formatting for local dev).
+- `mage helm:publish`: Packages and pushes the Helm chart as an OCI package to GHCR.
 - `mage test`: Run all tests with the race detector enabled.
 - `mage lint`: Run `golangci-lint` to check code quality.
 - `mage run`: Run the application locally.

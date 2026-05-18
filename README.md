@@ -238,7 +238,24 @@ docker-compose up -d
 
 ## Kubernetes / Helm
 
-A Helm chart is included in `helm/plexishow`.
+Plexishow is packaged and published as an **OCI Helm Chart** in the GitHub Container Registry (`ghcr.io`).
+
+### Production Installation (OCI Registry)
+
+```bash
+# Log in to GHCR Helm Registry (if required)
+helm registry login ghcr.io -u <your-username>
+
+# Install the official release from GHCR
+helm install plexishow oci://ghcr.io/segator/charts/plexishow \
+  --version 1.0.0 \
+  --set config.m3u_url="https://example.com/playlist.m3u" \
+  --set config.epg_url="https://example.com/epg.xml"
+```
+
+### Local Development / Source Installation
+
+You can also install the chart directly from the source repository:
 
 ```bash
 helm install plexishow ./helm/plexishow \
@@ -246,7 +263,12 @@ helm install plexishow ./helm/plexishow \
   --set config.epg_url="https://example.com/epg.xml"
 ```
 
-See `helm/plexishow/values.yaml` for all available options.
+### Key Chart Features
+
+- **Dynamic Configuration Map:** The `config:` block in `values.yaml` is fully serialized into `/etc/plexishow/config.yaml` using `toYaml`. This means all configuration capabilities supported by Plexishow (like advanced `ffmpeg` or hardware transcoding parameters) can be customized dynamically without altering Helm templates.
+- **Gateway API Support:** Includes native support for exposing the service using the Kubernetes Gateway API. Simply enable `httproute.enabled` and configure your parent Gateway refs in `values.yaml`.
+
+See [values.yaml](file:///home/aymerici/Plexishow/helm/plexishow/values.yaml) for all available options and detailed comments.
 
 ---
 

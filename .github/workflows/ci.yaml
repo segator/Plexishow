@@ -46,8 +46,8 @@ jobs:
       - name: Test
         run: mage test
 
-      - name: Build Docker image
-        run: mage docker:build
+      - name: Build
+        run: mage build
         env:
           VERSION: dev
 
@@ -72,6 +72,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Helm registry login
+        run: helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
@@ -79,8 +81,13 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push multi-arch Docker image
+      - name: Publish Docker image and Helm Chart
         run: |
+          # 1. Publish core release (Docker image & Helm chart) under the SemVer version
+          TAG_SEMVER="${GITHUB_REF_NAME#v}"
+          VERSION="${TAG_SEMVER}" mage publish
+          
+          # 2. Publish extra Docker tags (full tag with 'v' and minor version tag)
+          VERSION="${GITHUB_REF_NAME}" mage docker:push
           MINOR="${GITHUB_REF_NAME%.*}"
-          VERSION="${MINOR}" mage docker:build
           VERSION="${MINOR}" mage docker:push
