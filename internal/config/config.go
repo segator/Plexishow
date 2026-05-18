@@ -17,6 +17,7 @@ type Config struct {
 	StreamTimeout   time.Duration `yaml:"stream_timeout"`
 	RefreshInterval time.Duration `yaml:"refresh_interval"`
 	FFmpegPath      string        `yaml:"ffmpeg_path"`
+	LogsDir         string        `yaml:"logs_dir"`
 	DefaultHeaders  Headers       `yaml:"default_headers"`
 }
 
@@ -47,6 +48,7 @@ func applyDefaults(cfg *Config) {
 	cfg.StreamTimeout = 30 * time.Second
 	cfg.RefreshInterval = 5 * time.Minute
 	cfg.FFmpegPath = "ffmpeg"
+	cfg.LogsDir = "/tmp/plexishow-logs"
 }
 
 func loadFromFile(path string, cfg *Config) error {

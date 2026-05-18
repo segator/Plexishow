@@ -47,6 +47,7 @@ func main() {
 	streamTimeout := flag.String("stream-timeout", "", "Per-stream idle timeout (overrides config/env)")
 	refreshInterval := flag.String("refresh-interval", "", "M3U refresh interval (overrides config/env)")
 	token := flag.String("token", "", "X-TCDN-token for all channels (overrides M3U stream_headers)")
+	logsDir := flag.String("logs-dir", "", "Directory to write per-channel ffmpeg logs (optional)")
 	flag.Parse()
 
 	flags := make(map[string]string)
@@ -73,6 +74,9 @@ func main() {
 	}
 	if *token != "" {
 		flags["token"] = *token
+	}
+	if *logsDir != "" {
+		flags["logs_dir"] = *logsDir
 	}
 
 	cfg, err := config.Load(*configPath, flags)

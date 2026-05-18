@@ -39,4 +39,7 @@ func applyFlags(cfg *Config, flags map[string]string) {
 	if v, ok := flags["token"]; ok {
 		cfg.DefaultHeaders.Token = v
 	}
+	if v, ok := flags["logs_dir"]; ok {
+		cfg.LogsDir = v
+	}
 }

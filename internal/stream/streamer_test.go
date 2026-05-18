@@ -64,9 +64,13 @@ func TestBuildArgsNoKey(t *testing.T) {
 	args := buildArgs(ch)
 	want := []string{
 		"-y",
-		"-re", "-i", "http://example.com/stream.mpd",
+		"-probesize", "5000000",
+		"-analyzeduration", "2000000",
+		"-i", "http://example.com/stream.mpd",
+		"-map", "0:v:0", "-map", "0:a:0",
 		"-c:v", "copy",
 		"-c:a", "aac",
+		"-max_muxing_queue_size", "9999",
 		"-f", "mpegts",
 		"-",
 	}
@@ -153,7 +157,7 @@ func TestBroadcastMultiplex(t *testing.T) {
 		t.Fatal("addSub returned false for fresh session")
 	}
 
-	go sess.broadcast(nil, "test")
+	go sess.broadcast(nil, "test", "")
 
 	_, _ = pw.Write([]byte("hello"))
 	_ = pw.Close()
@@ -199,7 +203,7 @@ func TestSessionIdleTimeout(t *testing.T) {
 		idleTimeout: 100 * time.Millisecond,
 	}
 
-	go sess.broadcast(stderr, "test")
+	go sess.broadcast(stderr, "test", "")
 
 	ch := make(chan []byte, 1)
 	if !sess.addSub(ch) {

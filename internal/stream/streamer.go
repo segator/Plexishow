@@ -7,7 +7,9 @@ import (
 	"hash/fnv"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -74,8 +76,10 @@ func (s *session) removeSub(ch chan []byte) {
 	if s.subs == nil {
 		return
 	}
-	delete(s.subs, ch)
-	close(ch)
+	if _, ok := s.subs[ch]; ok {
+		delete(s.subs, ch)
+		close(ch)
+	}
 	if len(s.subs) == 0 && s.idleTimer == nil {
 		timeout := s.idleTimeout
 		if timeout == 0 {
@@ -94,14 +98,43 @@ func (s *session) kill() {
 	}
 }
 
-func (s *session) broadcast(stderr io.ReadCloser, name string) {
+func sanitizeName(name string) string {
+	r := strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "_")
+	return r.Replace(name)
+}
+
+func (s *session) broadcast(stderr io.ReadCloser, name string, logDir string) {
 	defer close(s.done)
 	if stderr != nil {
 		go func() {
 			color := channelColor(name)
+			var logFile *os.File
+			if logDir != "" {
+				if err := os.MkdirAll(logDir, 0o755); err == nil {
+					path := filepath.Join(logDir, sanitizeName(name)+".log")
+					//#nosec G304
+					f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+					if err == nil {
+						logFile = f
+						fmt.Printf("[stream] ffmpeg log for %s → %s\n", name, path)
+					}
+				}
+			}
+			defer func() {
+				if logFile != nil {
+					_ = logFile.Close()
+				}
+			}()
 			scanner := bufio.NewScanner(stderr)
 			for scanner.Scan() {
-				fmt.Printf("%s[%s]%s %s\n", color, name, ansiReset, scanner.Text())
+				line := scanner.Text()
+				// Suppress verbose DTS spam from terminal (still written to log file)
+				if !strings.Contains(line, "Non-monotonic DTS") {
+					fmt.Printf("%s[%s]%s %s\n", color, name, ansiReset, line)
+				}
+				if logFile != nil {
+					_, _ = fmt.Fprintln(logFile, line)
+				}
 			}
 		}()
 	}
@@ -115,8 +148,8 @@ func (s *session) broadcast(stderr io.ReadCloser, name string) {
 				select {
 				case ch <- data:
 				default:
-					close(ch)
-					delete(s.subs, ch)
+					// Buffer full: skip this packet for this client.
+					// For live TV a momentary glitch is better than disconnecting.
 				}
 			}
 			s.mu.Unlock()
@@ -152,12 +185,38 @@ type Manager struct {
 }
 
 func NewManager(cfg config.Config, st *store.Store, metrics *metrics.Registry) *Manager {
-	return &Manager{
+	m := &Manager{
 		cfg:      cfg,
 		store:    st,
 		metrics:  metrics,
 		sessions: make(map[string]*session),
 		sem:      make(chan struct{}, cfg.MaxStreams),
+	}
+	go m.statsLogger()
+	return m
+}
+
+func (m *Manager) statsLogger() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		m.mu.Lock()
+		if len(m.sessions) > 0 {
+			var stats []string
+			for id, sess := range m.sessions {
+				ch, ok := m.store.Get(id)
+				name := id
+				if ok {
+					name = ch.Name
+				}
+				sess.mu.Lock()
+				subs := len(sess.subs)
+				sess.mu.Unlock()
+				stats = append(stats, fmt.Sprintf("%s (%d users)", name, subs))
+			}
+			fmt.Printf("\033[1;36m[stats] %d active streams:\033[0m %s\n", len(m.sessions), strings.Join(stats, ", "))
+		}
+		m.mu.Unlock()
 	}
 }
 
@@ -169,8 +228,18 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chData := make(chan []byte, 50)
-	defer close(chData)
+	clientIP := r.RemoteAddr
+	// Try to get real IP if behind proxy
+	if realIP := r.Header.Get("X-Forwarded-For"); realIP != "" {
+		clientIP = strings.Split(realIP, ",")[0]
+	} else if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		clientIP = realIP
+	}
+
+	fmt.Printf("[stream] user connected to %s from %s\n", ch.Name, clientIP)
+	defer fmt.Printf("[stream] user disconnected from %s from %s\n", ch.Name, clientIP)
+
+	chData := make(chan []byte, 5000) // Much larger buffer for network jitter
 
 	m.mu.Lock()
 	sess, exists := m.sessions[id]
@@ -216,9 +285,6 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			if _, err := w.Write(data); err != nil {
 				return
-			}
-			if f, ok := w.(http.Flusher); ok {
-				f.Flush()
 			}
 			if !timer.Stop() {
 				select {
@@ -274,12 +340,13 @@ func (m *Manager) startSession(ch m3u.Channel) (*session, error) {
 	m.mu.Unlock()
 
 	go func() {
-		sess.broadcast(stderr, ch.Name)
+		sess.broadcast(stderr, ch.Name, m.cfg.LogsDir)
 		m.mu.Lock()
 		delete(m.sessions, ch.ID)
 		m.mu.Unlock()
 		<-m.sem
 		m.metrics.DecActive()
+		fmt.Printf("[stream] closed stream %s\n", ch.Name)
 	}()
 
 	return sess, nil
@@ -319,7 +386,13 @@ func buildArgs(ch m3u.Channel) []string {
 		args = append(args, "-headers", hdr.String())
 	}
 
-	args = append(args, "-re", "-i", ch.URL)
-	args = append(args, "-c:v", "copy", "-c:a", "aac", "-f", "mpegts", "-")
+	// Reduce startup analysis time
+	args = append(args, "-probesize", "5000000")
+	args = append(args, "-analyzeduration", "2000000")
+	args = append(args, "-i", ch.URL)
+	args = append(args, "-map", "0:v:0", "-map", "0:a:0")
+	args = append(args, "-c:v", "copy", "-c:a", "aac")
+	args = append(args, "-max_muxing_queue_size", "9999")
+	args = append(args, "-f", "mpegts", "-")
 	return args
 }
