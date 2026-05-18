@@ -1,4 +1,5 @@
 FROM alpine:3.21
+ARG TARGETARCH
 RUN apk add --no-cache \
     ffmpeg \
     ca-certificates \
