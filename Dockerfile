@@ -3,10 +3,11 @@ RUN apk add --no-cache \
     ffmpeg \
     ca-certificates \
     libva \
-    libva-intel-driver \
-    intel-media-driver \
     mesa-va-gallium \
-    libdrm
+    libdrm \
+    && if [ "$TARGETARCH" = "amd64" ]; then \
+        apk add --no-cache libva-intel-driver intel-media-driver; \
+    fi
 COPY bin/plexishow /usr/local/bin/plexishow
 COPY assets/ /assets/
 EXPOSE 8080
