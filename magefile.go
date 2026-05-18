@@ -270,16 +270,23 @@ type Helm mg.Namespace
 // Use the VERSION env var to override the chart and app version.
 func (Helm) Build(ctx context.Context) error {
 	fmt.Println("Packaging Helm chart...")
-	v := version
-	if strings.HasPrefix(v, "v") {
-		v = v[1:] // Strip leading 'v' for SemVer compliance in Helm
+	
+	// Chart version must comply strictly with SemVer (e.g. 0.0.0-dev or 1.0.0)
+	chartVersion := version
+	if strings.HasPrefix(chartVersion, "v") {
+		chartVersion = chartVersion[1:] // Strip leading 'v'
 	}
-	// If it doesn't have dots (e.g. just a commit hash like ce1496b-dirty),
-	// format it as a valid SemVer pre-release version: 0.0.0-<git-ref>
-	if !strings.Contains(v, ".") {
-		v = "0.0.0-" + v
+	if !strings.Contains(chartVersion, ".") {
+		chartVersion = "0.0.0-" + chartVersion
 	}
-	return sh.RunV("helm", "package", "helm/plexishow", "--version", v, "--app-version", v)
+	
+	// App version is free-form and matches the Docker image tag standard (e.g. dev or 1.0.0)
+	appVersion := version
+	if strings.HasPrefix(appVersion, "v") {
+		appVersion = appVersion[1:] // Strip leading 'v' to match standard Docker release tags
+	}
+
+	return sh.RunV("helm", "package", "helm/plexishow", "--version", chartVersion, "--app-version", appVersion)
 }
 
 // Publish packages and pushes the Helm chart to GHCR as an OCI registry package.
@@ -287,14 +294,16 @@ func (Helm) Build(ctx context.Context) error {
 func (Helm) Publish(ctx context.Context) error {
 	mg.Deps(Helm{}.Build)
 	fmt.Println("Publishing Helm chart...")
-	v := version
-	if strings.HasPrefix(v, "v") {
-		v = v[1:] // Strip leading 'v'
+	
+	chartVersion := version
+	if strings.HasPrefix(chartVersion, "v") {
+		chartVersion = chartVersion[1:] // Strip leading 'v'
 	}
-	if !strings.Contains(v, ".") {
-		v = "0.0.0-" + v
+	if !strings.Contains(chartVersion, ".") {
+		chartVersion = "0.0.0-" + chartVersion
 	}
-	chartTar := fmt.Sprintf("plexishow-%s.tgz", v)
+	
+	chartTar := fmt.Sprintf("plexishow-%s.tgz", chartVersion)
 	defer os.Remove(chartTar) // Clean up the tgz file after pushing
 
 	owner := os.Getenv("GITHUB_REPOSITORY_OWNER")

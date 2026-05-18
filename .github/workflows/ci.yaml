@@ -35,6 +35,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Helm registry login
+        run: helm registry login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+
       - name: Format
         run: |
           mage fmt
@@ -51,9 +54,9 @@ jobs:
         env:
           VERSION: dev
 
-      - name: Push multi-arch Docker image
+      - name: Push multi-arch Docker image and OCI Helm Chart
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: mage docker:push
+        run: mage publish
         env:
           VERSION: dev
 
