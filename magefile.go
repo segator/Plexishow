@@ -120,12 +120,18 @@ func (Docker) Build(ctx context.Context) error {
 	return sh.RunV("docker", "build", "-t", tag, "-f", "Dockerfile", ".")
 }
 
-// Publish pushes the Docker image to the registry.
+// Publish pushes the Docker image to the registry (image must already exist locally).
 func (Docker) Publish(ctx context.Context) error {
-	mg.Deps(Docker{}.Build)
 	fmt.Println("Publishing Docker image...")
 	tag := fmt.Sprintf("%s:%s", imageName, version)
-	return sh.RunV("docker", "push", tag)
+	latest := fmt.Sprintf("%s:latest", imageName)
+	if err := sh.RunV("docker", "tag", tag, latest); err != nil {
+		return err
+	}
+	if err := sh.RunV("docker", "push", tag); err != nil {
+		return err
+	}
+	return sh.RunV("docker", "push", latest)
 }
 
 // Release runs GoReleaser (local, needs git tags)

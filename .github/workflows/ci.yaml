@@ -51,7 +51,9 @@ jobs:
 
       - name: Publish Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: docker push ghcr.io/segator/plexishow:dev
+        run: mage docker:publish
+        env:
+          VERSION: dev
 
   release:
     runs-on: ubuntu-latest
